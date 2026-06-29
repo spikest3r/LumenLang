@@ -1,0 +1,14 @@
+#pragma once
+#include <fstream>
+#include <string>
+#include <iostream>
+#include <vector>
+#include <map>
+#include <iomanip>
+#include <unordered_map>
+#include <algorithm>
+#include <cctype>
+#include <cstdint>
+#include <cstring>
+#include <variant>
+#include <cmath>

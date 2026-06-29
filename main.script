@@ -1,4 +1,2 @@
-a = 20
-b = 'Hello'
+a = 20 + 30
 print a
-print b
