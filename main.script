@@ -1,0 +1,4 @@
+a = 20
+b = 'Hello'
+print a
+print b
