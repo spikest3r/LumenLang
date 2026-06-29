@@ -1,2 +1,8 @@
-a = 20 + 30
-print a
+yearNow = 2026
+userYear = 0
+println 'Hello, world!'
+print 'Enter your birth year: '
+inputInt &userYear
+age = yearNow - userYear
+print 'Your age: '
+println age

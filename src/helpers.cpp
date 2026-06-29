@@ -19,6 +19,8 @@ bool isPureNumber(const std::string& s) {
 }
 
 int resolveVariableIndex(std::string keyword, std::unordered_map<std::string, int>& variableMap, int& variableIndex) {
+    replaceAll(keyword, "&", "");
+    
     auto it = variableMap.find(keyword);
 
     if (it != variableMap.end()) {

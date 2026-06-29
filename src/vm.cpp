@@ -70,13 +70,34 @@ int execute(
                 {
                     // TODO: Offload to lookup map function
                     auto functionIndex = bytecode[PC + 1];
-                    if(functionIndex == 1) {
-                        // print
-                        auto arg0 = stack.back();
-                        stack.pop_back();
-                        std::visit([](const auto& val) {
-                            std::cout << val << std::endl;
-                        }, arg0.data);
+                    switch(functionIndex) {
+                        case 1:
+                        case 2:
+                            {
+                                auto arg0 = stack.back();
+                                stack.pop_back();
+                                std::visit([](const auto& val) {
+                                    std::cout << val;
+                                }, arg0.data);
+                                if(functionIndex == 1) std::cout << std::endl;
+                            }
+                            break;
+                        case 3:
+                            {
+                                std::string input;
+                                auto arg0 = getInt(stack.back()); // holds variable index
+                                stack.pop_back();
+                                std::cin >> input;
+                                int result = 0;
+                                try {
+                                    result = std::atoi(input.c_str());
+                                } catch(...) {
+                                    std::cout << "Invalid value!" << std::endl;
+                                }
+                                variables[arg0].type = TAG_INT;
+                                variables[arg0].data = result;
+                            }
+                            break;
                     }
                 }
                 break;

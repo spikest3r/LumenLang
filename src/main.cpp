@@ -8,7 +8,9 @@ std::unordered_map<std::string, int> variableMap;
 std::vector<std::string> stringPool;
 std::unordered_map<std::string, int> stringPoolMap;
 std::unordered_map<std::string, int> funcList = {
-    {"print", 0x01}
+    {"println", 0x01},
+    {"print", 0x02},
+    {"inputInt", 0x03}
 };
 
 int stringIndex = 0;

@@ -48,21 +48,15 @@ int compile(std::string fileName,
                 continue;
             } else {
                 // match function call
-                // TODO: Replace with find
-                bool matched = false;
-                for(const auto& func: funcList) {
-                    if(token == func.first) {
-                        if(op != NONE) {
-                            std::cout << "Not NONE 2" << std::endl;
-                            return -1;
-                        }
-                        op = FUNC_CALL;
-                        funcIndex = func.second;
-                        matched = true;
-                        break;
+                auto it = funcList.find(token);
+                if (it != funcList.end()) {
+                    if(op != NONE) {
+                        std::cout << "Not NONE 2" << std::endl;
+                        return -1;
                     }
+                    op = FUNC_CALL;
+                    funcIndex = it->second;
                 }
-                if(matched) continue;
             }
 
             keyword = token;
@@ -95,8 +89,9 @@ int compile(std::string fileName,
                             bytecode.push_back(x); // value
                         } else {
                             // assume variable
+                            bool ref = token.starts_with("&");
                             auto index = resolveVariableIndex(token, variableMap, variableIndex);
-                            bytecode.push_back(0x03); // variable
+                            bytecode.push_back(ref ? 0x02 : 0x03); // variable
                             bytecode.push_back(index); // variable index
                         }
                     }
