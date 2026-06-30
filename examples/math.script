@@ -1,6 +1,7 @@
-a = 20
+z = -20
+a = z
 b = 30
 c = a + b
 d = c * a + b
 e = d / (a + b)
-print e
+println e

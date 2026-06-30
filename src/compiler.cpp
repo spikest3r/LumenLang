@@ -3,6 +3,7 @@
 struct UnresolvedJump {
     std::string keyword;
     int location;
+    int line;
 };
 
 static const std::unordered_map<std::string, ConditionOp> condOpMap = {
@@ -28,6 +29,10 @@ std::unordered_map<std::string, int> funcList = {
     {"print", 0x02},
     {"inputInt", 0x03}
 };
+
+void printError(std::string error, int line) {
+    std::cerr << "Error on line " << line << std::endl << "  >>> " << error << std::endl;
+}
 
 void pushToStack(std::string token, std::vector<int>& bytecode, 
     std::unordered_map<std::string, int>& variableMap,
@@ -69,6 +74,8 @@ int compile(std::string fileName,
     int blockDepth = 0;
     std::vector<bool> elseDefined;
 
+    int lineIndex = 1; // for user messages
+
     while (std::getline(file, line)) {
         if(verbose) std::cout << line << std::endl;
         auto tokens = tokenizeFormula(line);
@@ -82,6 +89,7 @@ int compile(std::string fileName,
         Operation op = NONE;
         int funcIndex;
         int conditionArgs = 0;
+        int varIndex_assign = 0;
         ConditionOp condOp = COP_NONE;
         for(const auto& token: tokens) {
             if(token == "=") {
@@ -98,33 +106,34 @@ int compile(std::string fileName,
                     fromStack = true;
                 }
                 if(op != NONE) {
-                    std::cerr << "Not NONE" << std::endl;
+                    printError("Syntax error", lineIndex);
                     return -1;
                 }
                 if(!fromStack) op = ASSIGN;
-                bytecode.push_back(fromStack ? 0x02 : 0x01); // assign
+                if(fromStack) bytecode.push_back(0x02);
                 keyword = tokens[0];
                 auto var_index = resolveVariableIndex(keyword, variableMap, variableIndex);
-                bytecode.push_back(var_index);
+                varIndex_assign = var_index;
+                if(fromStack) bytecode.push_back(var_index);
                 if(fromStack) break;
                 continue;
             } else if(token == "label") {
                 if(op != NONE) {
-                    std::cerr << "Not NONE 3" << std::endl;
+                    printError("Syntax error", lineIndex);
                     return -1;
                 }
                 op = LABEL;
                 continue;
             } else if(token == "jump") {
                 if(op != NONE) {
-                    std::cerr << "Not NONE 4" << std::endl;
+                    printError("Syntax error", lineIndex);
                     return -1;
                 }
                 op = JUMP;
                 continue;
             } else if(token == "if") {
                 if(op != NONE) {
-                    std::cerr << "Not NONE 5" << std::endl;
+                    printError("Syntax error", lineIndex);
                     return -1;
                 }
                 op = IF;
@@ -133,7 +142,7 @@ int compile(std::string fileName,
                 continue;
             } else if(token == "endif") {
                 if(blockDepth == 0) {
-                    std::cerr << "Invalid syntax" << std::endl;
+                    printError("Unexpected 'endif' (no matching 'if')", lineIndex);
                     return -1;
                 }
                 int loc = condJumpStack.back(); condJumpStack.pop_back();
@@ -143,7 +152,7 @@ int compile(std::string fileName,
                 continue;
             } else if(token == "else") {
                 if(blockDepth == 0) {
-                    std::cerr << "Invalid syntax" << std::endl;
+                    printError("Unexpected 'else' (no matching 'if')", lineIndex);
                     return -1;
                 }
                 elseDefined[blockDepth - 1] = true;
@@ -161,7 +170,7 @@ int compile(std::string fileName,
                     auto it = funcList.find(token);
                     if (it != funcList.end()) {
                         if(op != NONE) {
-                            std::cerr << "Not NONE 2" << std::endl;
+                            printError("Syntax error", lineIndex);
                             return -1;
                         }
                         op = FUNC_CALL;
@@ -175,16 +184,24 @@ int compile(std::string fileName,
 
             switch(op) {
                 case ASSIGN:
-                    if(token.starts_with("'")) {
+                    bytecode.push_back(0x03); // PUSH
+                    if(token.starts_with("'")) { // string
                         auto strIndex = resolveString(token, stringPool, stringPoolMap, stringIndex);
                         bytecode.push_back(0x01);
                         bytecode.push_back(strIndex);
-                    } else {
+                    } else if(isVar(token)) {
+                        auto varIndex = resolveVariableIndex(token, variableMap, variableIndex);
+                        bytecode.push_back(0x03);
+                        bytecode.push_back(varIndex);
+                    } 
+                    else {
                         // assume int for now
                         int x = std::stoi(token);
                         bytecode.push_back(0x02);
                         bytecode.push_back(x);
                     }
+                    bytecode.push_back(0x02); // POP
+                    bytecode.push_back(varIndex_assign);
                     break;
                 case FUNC_CALL:
                 case PUSH_STACK:
@@ -207,7 +224,7 @@ int compile(std::string fileName,
                         } else {
                             bytecode.push_back(0x05);
                             bytecode.push_back(0xBE);
-                            unresolvedJumps.push_back({keyword, (int)(bytecode.size() - 1)});
+                            unresolvedJumps.push_back({keyword, (int)(bytecode.size() - 1), lineIndex});
                         }
                         op = NONE;
                     }
@@ -217,13 +234,13 @@ int compile(std::string fileName,
                         auto it = condOpMap.find(keyword);
                         if (it != condOpMap.end()) {
                             if (conditionArgs != 1) {
-                                std::cerr << "Invalid syntax! 3" << std::endl;
+                                printError("Syntax error", lineIndex);
                                 return -1;
                             }
                             condOp = it->second;
                         } else {
                             if(conditionArgs > 1 && condOp != COP_NONE) {
-                                std::cerr << "Invalid syntax!" << std::endl;
+                                printError("Syntax error", lineIndex);
                                 return -1;
                             }
                             pushToStack(token, bytecode, variableMap, stringPool, stringPoolMap, variableIndex, stringIndex);
@@ -245,20 +262,22 @@ int compile(std::string fileName,
                     auto it = condOpcodeMap.find(condOp);
                     if (it != condOpcodeMap.end()) {
                         if (conditionArgs != 2) {
-                            std::cerr << "Invalid syntax!" << std::endl;
+                            printError("Syntax error", lineIndex);
                             return -1;
                         }
                         bytecode.push_back(it->second);
                         bytecode.push_back(0xBF);
                         condJumpStack.push_back(bytecode.size() - 1);
                     } else {
-                        std::cerr << "Inval" << std::endl;
+                        printError("Syntax error", lineIndex);
                         return -1;
                     }
                 }
                 break;
         }
         op = NONE;
+
+        lineIndex++;
     }
 
     bytecode.push_back(0xFF); // HALT
@@ -266,12 +285,13 @@ int compile(std::string fileName,
     for(const auto& it : unresolvedJumps) {
         auto keyword = it.keyword;
         auto location = it.location;
+        auto line = it.line;
 
         auto it2 = jumpTable.find(keyword);
         if(it2 != jumpTable.end()) {
             bytecode[location] = it2->second;
         } else {
-            std::cerr << "Undefined jump label!" << std::endl;
+            printError("Label '" + keyword + "' is not defined", line);
             return -1;
         }
     }

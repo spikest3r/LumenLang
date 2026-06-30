@@ -10,15 +10,6 @@ static bool isNum(const std::string &s) {
     }
 }
 
-static bool isVar(const std::string &s) {
-    if (s.empty()) return false;
-    if (std::isdigit(static_cast<unsigned char>(s[0]))) return false; // can't start with digit
-    for (char c : s) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') return false;
-    }
-    return true;
-}
-
 static bool isOp(char c) {
     return c == '+' || c == '-' || c == '*' || c == '/' || c == '^' || c == '%';
 }

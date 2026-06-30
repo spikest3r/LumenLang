@@ -21,23 +21,6 @@ int execute(
         auto opcode = bytecode[PC];
         int offset = getOpCodeOffset(opcode);
         switch(opcode) {
-
-            case 0x01: // ASSIGN
-                {
-                    auto varIndex = bytecode[PC + 1];
-                    auto varType = bytecode[PC + 2];
-                    auto value = bytecode[PC + 3];
-                    variables[varIndex].type = static_cast<TypeTag>(varType);
-                    switch(varType) {
-                        case TAG_INT:
-                            variables[varIndex].data = value;
-                            break;
-                        case TAG_STRING:
-                            variables[varIndex].data = stringPool[value];
-                            break;
-                    }
-                }
-                break;
             case 0x02:
                 {
                     auto varIndex = bytecode[PC + 1];

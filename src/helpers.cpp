@@ -46,8 +46,8 @@ int resolveString(std::string str, std::vector<std::string>& stringPool, std::un
 
 int getOpCodeOffset(int opcode) {
     switch(opcode) {
-        case 0x01:
-            return 4;
+        // case 0x01:
+        //     return 4;
         case 0x03:
             return 3;
         case 0x04:
@@ -69,4 +69,13 @@ int getOpCodeOffset(int opcode) {
             return 1;
     }
     return 0;
+}
+
+bool isVar(const std::string &s) {
+    if (s.empty()) return false;
+    if (std::isdigit(static_cast<unsigned char>(s[0]))) return false; // can't start with digit
+    for (char c : s) {
+        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') return false;
+    }
+    return true;
 }
