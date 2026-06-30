@@ -153,6 +153,45 @@ int execute(
                 stack.push_back(result);
                 break;
             }
+            case 0xA5: { // MOD
+                Variant b = stack.back(); stack.pop_back();
+                Variant a = stack.back(); stack.pop_back();
+                Variant result;
+                result.type = TAG_INT;
+                result.data = getInt(a) % getInt(b);
+                stack.push_back(result);
+                break;
+            }
+            case 0xB0: // ==
+            case 0xB1: // >
+            case 0xB2: // <
+            case 0xB3: // >=
+            case 0xB4: // <=
+            case 0xB5: // != 
+            {
+                Variant b = stack.back(); stack.pop_back();
+                Variant a = stack.back(); stack.pop_back();
+                int falseIndex = bytecode[PC + 1];
+                
+                bool result = false;
+                int64_t av = getInt(a);
+                int64_t bv = getInt(b);
+                
+                switch (opcode) {
+                    case 0xB0: result = av == bv; break;
+                    case 0xB1: result = av >  bv; break;
+                    case 0xB2: result = av <  bv; break;
+                    case 0xB3: result = av >= bv; break;
+                    case 0xB4: result = av <= bv; break;
+                    case 0xB5: result = av != bv; break;
+                }
+                
+                if (!result) {
+                    PC = falseIndex;
+                    continue;
+                }
+                break;
+            }
             case 0xFF:
                 halt = true;
                 break;

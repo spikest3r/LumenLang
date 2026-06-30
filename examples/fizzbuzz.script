@@ -1,0 +1,25 @@
+N = 0
+print 'N='
+inputInt &N
+i = 1
+label loop
+i15 = i % 15
+if i15 == 0
+println 'FizzBuzz'
+else
+i3 = i % 3
+if i3 == 0
+println 'Fizz'
+else
+i5 = i % 5
+if i5 == 0
+println 'Buzz'
+else
+println i
+endif
+endif
+endif
+i = i + 1
+if i <= N
+jump loop
+endif

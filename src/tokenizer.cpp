@@ -19,7 +19,7 @@ std::vector<std::string> tokenizeFormula(std::string formula) {
                 token = "";
                 continue;
             }
-        } else if (c == '+' || c == '-' || c == '*' || c == '/') {
+        } else if (c == '+' || c == '-' || c == '*' || c == '/' || c == '%') {
             if(!isQuoteOpen) {
                 if (token.length() > 0) tokens.push_back(token);
                 tokens.push_back(std::string(1, c));

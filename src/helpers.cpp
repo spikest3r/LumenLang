@@ -20,13 +20,11 @@ bool isPureNumber(const std::string& s) {
 
 int resolveVariableIndex(std::string keyword, std::unordered_map<std::string, int>& variableMap, int& variableIndex) {
     replaceAll(keyword, "&", "");
-    
     auto it = variableMap.find(keyword);
 
     if (it != variableMap.end()) {
         return it->second;
     } else {
-        // TODO: Resize vector
         variableMap[keyword] = variableIndex;
         return variableIndex++;
     }
@@ -54,6 +52,12 @@ int getOpCodeOffset(int opcode) {
             return 3;
         case 0x04:
         case 0x02:
+        case 0xB0: // ==
+        case 0xB1: // >
+        case 0xB2: // <
+        case 0xB3: // >=
+        case 0xB4: // <=
+        case 0xB5: // != 
             return 2;
         case 0xFF:
         case 0xA0:
@@ -61,6 +65,7 @@ int getOpCodeOffset(int opcode) {
         case 0xA2:
         case 0xA3:
         case 0xA4:
+        case 0xA5:
             return 1;
     }
     return 0;

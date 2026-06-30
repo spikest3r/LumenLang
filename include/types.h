@@ -18,5 +18,16 @@ typedef enum {
     FUNC_CALL,
     PUSH_STACK,
     LABEL,
-    JUMP
+    JUMP,
+    IF, ELSE
 } Operation;
+
+typedef enum {
+    COP_NONE,
+    EQUALS,
+    GREATER,
+    LESSER,
+    GREATER_OR_EQ,
+    LESSER_OR_EQ,
+    NOT_EQUALS
+} ConditionOp;

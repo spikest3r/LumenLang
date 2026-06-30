@@ -20,12 +20,12 @@ static bool isVar(const std::string &s) {
 }
 
 static bool isOp(char c) {
-    return c == '+' || c == '-' || c == '*' || c == '/' || c == '^';
+    return c == '+' || c == '-' || c == '*' || c == '/' || c == '^' || c == '%';
 }
 
 static int getPrec(char c) {
     if (c == '+' || c == '-') return 1;
-    if (c == '*' || c == '/') return 2;
+    if (c == '*' || c == '/' || c == '%') return 2;
     if (c == '^') return 3;
     return 0;
 }
@@ -122,6 +122,7 @@ static void evalRPN(const std::vector<std::string> &rpn, std::vector<int>& bytec
                 case '*': bytecode.push_back(0xA2); break; // MUL
                 case '/': bytecode.push_back(0xA3); break; // DIV
                 case '^': bytecode.push_back(0xA4); break; // POW
+                case '%': bytecode.push_back(0xA5); break; // MOD
             }
 
             stack.push_back(t); // result placeholder, consumed by later ops if chained

@@ -5,6 +5,48 @@ struct UnresolvedJump {
     int location;
 };
 
+static const std::unordered_map<std::string, ConditionOp> condOpMap = {
+    {"==", EQUALS},
+    {">",  GREATER},
+    {"<",  LESSER},
+    {">=", GREATER_OR_EQ},
+    {"<=", LESSER_OR_EQ},
+    {"!=", NOT_EQUALS}
+};
+
+static const std::unordered_map<ConditionOp, int> condOpcodeMap = {
+    {EQUALS, 0xB0},
+    {GREATER,  0xB1},
+    {LESSER,  0xB2},
+    {GREATER_OR_EQ, 0xB3},
+    {LESSER_OR_EQ, 0xB4},
+    {NOT_EQUALS, 0xB5}
+};
+
+void pushToStack(std::string token, std::vector<int>& bytecode, 
+    std::unordered_map<std::string, int>& variableMap,
+    std::vector<std::string>& stringPool, std::unordered_map<std::string, int>& stringPoolMap,
+    int& variableIndex, int& stringIndex
+) {
+    bytecode.push_back(0x03); // push to stack
+    if(token.starts_with("'")) {
+        auto strIndex = resolveString(token, stringPool, stringPoolMap, stringIndex);
+        bytecode.push_back(0x01); // string
+        bytecode.push_back(strIndex); // string index
+    } else if(isPureNumber(token)) {
+        // integer
+        int x = std::stoi(token);
+        bytecode.push_back(0x02); // int
+        bytecode.push_back(x); // value
+    } else {
+        // assume variable
+        bool ref = token.starts_with("&");
+        auto index = resolveVariableIndex(token, variableMap, variableIndex);
+        bytecode.push_back(ref ? 0x02 : 0x03); // variable
+        bytecode.push_back(index); // variable index
+    }
+}
+
 int compile(std::string fileName, 
     std::vector<int>& bytecode,
     std::unordered_map<std::string, int>& variableMap,
@@ -17,6 +59,10 @@ int compile(std::string fileName,
 
     std::unordered_map<std::string, int> jumpTable;
     std::vector<UnresolvedJump> unresolvedJumps;
+    std::vector<int> condJumpStack;
+
+    int blockDepth = 0;
+    std::vector<bool> elseDefined;
 
     while (std::getline(file, line)) {
         if(verbose) std::cout << line << std::endl;
@@ -30,6 +76,8 @@ int compile(std::string fileName,
         std::string keyword = "";
         Operation op = NONE;
         int funcIndex;
+        int conditionArgs = 0;
+        ConditionOp condOp = COP_NONE;
         for(const auto& token: tokens) {
             if(token == "=") {
                 bool fromStack = false;
@@ -50,6 +98,7 @@ int compile(std::string fileName,
                 }
                 if(!fromStack) op = ASSIGN;
                 bytecode.push_back(fromStack ? 0x02 : 0x01); // assign
+                keyword = tokens[0];
                 auto var_index = resolveVariableIndex(keyword, variableMap, variableIndex);
                 bytecode.push_back(var_index);
                 if(fromStack) break;
@@ -68,6 +117,38 @@ int compile(std::string fileName,
                 }
                 op = JUMP;
                 continue;
+            } else if(token == "if") {
+                if(op != NONE) {
+                    std::cerr << "Not NONE 5" << std::endl;
+                    return -1;
+                }
+                op = IF;
+                blockDepth++;
+                elseDefined.push_back(false);
+                continue;
+            } else if(token == "endif") {
+                if(blockDepth == 0) {
+                    std::cerr << "Invalid syntax" << std::endl;
+                    return -1;
+                }
+                int loc = condJumpStack.back(); condJumpStack.pop_back();
+                bytecode[loc] = bytecode.size(); 
+                blockDepth--;
+                elseDefined.pop_back();
+                continue;
+            } else if(token == "else") {
+                if(blockDepth == 0) {
+                    std::cerr << "Invalid syntax" << std::endl;
+                    return -1;
+                }
+                elseDefined[blockDepth - 1] = true;
+                int loc = condJumpStack.back();
+                bytecode[loc] = bytecode.size() + 2; // patch false jump to point past the upcoming skip-jump
+                bytecode.push_back(0x05);
+                bytecode.push_back(0xDE);
+                condJumpStack.pop_back();
+                condJumpStack.push_back(bytecode.size() - 1); // now track the else's skip-jump
+                continue;
             }
             else {
                 if(op == NONE) {
@@ -81,6 +162,7 @@ int compile(std::string fileName,
                         op = FUNC_CALL;
                         funcIndex = it->second;
                     }
+                    continue;
                 }
             }
 
@@ -102,23 +184,7 @@ int compile(std::string fileName,
                 case FUNC_CALL:
                 case PUSH_STACK:
                     {
-                        bytecode.push_back(0x03); // push to stack
-                        if(token.starts_with("'")) {
-                            auto strIndex = resolveString(token, stringPool, stringPoolMap, stringIndex);
-                            bytecode.push_back(0x01); // string
-                            bytecode.push_back(strIndex); // string index
-                        } else if(isPureNumber(token)) {
-                            // integer
-                            int x = std::stoi(token);
-                            bytecode.push_back(0x02); // int
-                            bytecode.push_back(x); // value
-                        } else {
-                            // assume variable
-                            bool ref = token.starts_with("&");
-                            auto index = resolveVariableIndex(token, variableMap, variableIndex);
-                            bytecode.push_back(ref ? 0x02 : 0x03); // variable
-                            bytecode.push_back(index); // variable index
-                        }
+                        pushToStack(token, bytecode, variableMap, stringPool, stringPoolMap, variableIndex, stringIndex);
                     }
                     break;
                 case LABEL:
@@ -135,10 +201,29 @@ int compile(std::string fileName,
                             bytecode.push_back(it->second);
                         } else {
                             bytecode.push_back(0x05);
-                            bytecode.push_back(0xFF);
+                            bytecode.push_back(0xBE);
                             unresolvedJumps.push_back({keyword, (int)(bytecode.size() - 1)});
                         }
                         op = NONE;
+                    }
+                    break;
+                case IF:
+                    {
+                        auto it = condOpMap.find(keyword);
+                        if (it != condOpMap.end()) {
+                            if (conditionArgs != 1) {
+                                std::cerr << "Invalid syntax! 3" << std::endl;
+                                return -1;
+                            }
+                            condOp = it->second;
+                        } else {
+                            if(conditionArgs > 1 && condOp != COP_NONE) {
+                                std::cerr << "Invalid syntax!" << std::endl;
+                                return -1;
+                            }
+                            pushToStack(token, bytecode, variableMap, stringPool, stringPoolMap, variableIndex, stringIndex);
+                            conditionArgs++;
+                        }
                     }
                     break;
                 default:
@@ -149,6 +234,23 @@ int compile(std::string fileName,
             case FUNC_CALL:
                 bytecode.push_back(0x04); // call function
                 bytecode.push_back(funcIndex);
+                break;
+            case IF:
+                {
+                    auto it = condOpcodeMap.find(condOp);
+                    if (it != condOpcodeMap.end()) {
+                        if (conditionArgs != 2) {
+                            std::cerr << "Invalid syntax!" << std::endl;
+                            return -1;
+                        }
+                        bytecode.push_back(it->second);
+                        bytecode.push_back(0xBF);
+                        condJumpStack.push_back(bytecode.size() - 1);
+                    } else {
+                        std::cerr << "Inval" << std::endl;
+                        return -1;
+                    }
+                }
                 break;
         }
         op = NONE;
