@@ -1,2 +1,5 @@
 .vscode/
 main
+interpreter
+*.bin
+examples/*.bin

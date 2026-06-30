@@ -23,6 +23,12 @@ static const std::unordered_map<ConditionOp, int> condOpcodeMap = {
     {NOT_EQUALS, 0xB5}
 };
 
+std::unordered_map<std::string, int> funcList = {
+    {"println", 0x01},
+    {"print", 0x02},
+    {"inputInt", 0x03}
+};
+
 void pushToStack(std::string token, std::vector<int>& bytecode, 
     std::unordered_map<std::string, int>& variableMap,
     std::vector<std::string>& stringPool, std::unordered_map<std::string, int>& stringPoolMap,
@@ -51,7 +57,6 @@ int compile(std::string fileName,
     std::vector<int>& bytecode,
     std::unordered_map<std::string, int>& variableMap,
     std::vector<std::string>& stringPool, std::unordered_map<std::string, int>& stringPoolMap,
-    const std::unordered_map<std::string, int>& funcList,
     int& variableIndex, int& stringIndex, bool verbose
 ) {
     std::ifstream file(fileName);

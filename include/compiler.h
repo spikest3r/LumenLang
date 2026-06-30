@@ -8,7 +8,6 @@ int compile(std::string fileName,
     std::vector<int>& bytecode,
     std::unordered_map<std::string, int>& variableMap,
     std::vector<std::string>& stringPool, std::unordered_map<std::string, int>& stringPoolMap,
-    const std::unordered_map<std::string, int>& funcList,
     int& variableIndex, int& stringIndex, bool verbose = false
 );
 

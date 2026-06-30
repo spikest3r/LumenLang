@@ -10,5 +10,6 @@
 #include <cctype>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
 #include <variant>
 #include <cmath>

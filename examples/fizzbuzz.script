@@ -1,6 +1,7 @@
 N = 0
 print 'N='
 inputInt &N
+println ''
 i = 1
 label loop
 i15 = i % 15
