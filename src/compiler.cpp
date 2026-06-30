@@ -1,5 +1,10 @@
 #include "compiler.h"
 
+struct UnresolvedJump {
+    std::string keyword;
+    int location;
+};
+
 int compile(std::string fileName, 
     std::vector<int>& bytecode,
     std::unordered_map<std::string, int>& variableMap,
@@ -9,6 +14,9 @@ int compile(std::string fileName,
 ) {
     std::ifstream file(fileName);
     std::string line;
+
+    std::unordered_map<std::string, int> jumpTable;
+    std::vector<UnresolvedJump> unresolvedJumps;
 
     while (std::getline(file, line)) {
         if(verbose) std::cout << line << std::endl;
@@ -37,7 +45,7 @@ int compile(std::string fileName,
                     fromStack = true;
                 }
                 if(op != NONE) {
-                    std::cout << "Not NONE" << std::endl;
+                    std::cerr << "Not NONE" << std::endl;
                     return -1;
                 }
                 if(!fromStack) op = ASSIGN;
@@ -46,16 +54,33 @@ int compile(std::string fileName,
                 bytecode.push_back(var_index);
                 if(fromStack) break;
                 continue;
-            } else {
-                // match function call
-                auto it = funcList.find(token);
-                if (it != funcList.end()) {
-                    if(op != NONE) {
-                        std::cout << "Not NONE 2" << std::endl;
-                        return -1;
+            } else if(token == "label") {
+                if(op != NONE) {
+                    std::cerr << "Not NONE 3" << std::endl;
+                    return -1;
+                }
+                op = LABEL;
+                continue;
+            } else if(token == "jump") {
+                if(op != NONE) {
+                    std::cerr << "Not NONE 4" << std::endl;
+                    return -1;
+                }
+                op = JUMP;
+                continue;
+            }
+            else {
+                if(op == NONE) {
+                    // match function call
+                    auto it = funcList.find(token);
+                    if (it != funcList.end()) {
+                        if(op != NONE) {
+                            std::cerr << "Not NONE 2" << std::endl;
+                            return -1;
+                        }
+                        op = FUNC_CALL;
+                        funcIndex = it->second;
                     }
-                    op = FUNC_CALL;
-                    funcIndex = it->second;
                 }
             }
 
@@ -96,6 +121,26 @@ int compile(std::string fileName,
                         }
                     }
                     break;
+                case LABEL:
+                    {
+                        jumpTable[keyword] = bytecode.size(); // point to next instruction
+                        op = NONE;
+                    }
+                    break;
+                case JUMP:
+                    {
+                        auto it = jumpTable.find(keyword);
+                        if(it != jumpTable.end()) {
+                            bytecode.push_back(0x05);
+                            bytecode.push_back(it->second);
+                        } else {
+                            bytecode.push_back(0x05);
+                            bytecode.push_back(0xFF);
+                            unresolvedJumps.push_back({keyword, (int)(bytecode.size() - 1)});
+                        }
+                        op = NONE;
+                    }
+                    break;
                 default:
                     break;
             }
@@ -110,6 +155,19 @@ int compile(std::string fileName,
     }
 
     bytecode.push_back(0xFF); // HALT
+
+    for(const auto& it : unresolvedJumps) {
+        auto keyword = it.keyword;
+        auto location = it.location;
+
+        auto it2 = jumpTable.find(keyword);
+        if(it2 != jumpTable.end()) {
+            bytecode[location] = it2->second;
+        } else {
+            std::cerr << "Undefined jump label!" << std::endl;
+            return -1;
+        }
+    }
 
     file.close();
 

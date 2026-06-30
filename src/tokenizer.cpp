@@ -6,20 +6,26 @@ std::vector<std::string> tokenizeFormula(std::string formula) {
     bool isQuoteOpen = false;
     for (char c : formula) {
         if (c == '(' || c == ')') {
-            if (token.length() > 0) tokens.push_back(token);
-            tokens.push_back(std::string(1, c));
-            token = "";
-            continue;
-        } /*else if (c == ',') {
-            if (token.length() > 0) tokens.push_back(token);
-            tokens.push_back(",");
-            token = "";
-            continue;
-        }*/ else if (c == '+' || c == '-' || c == '*' || c == '/') {
-            if (token.length() > 0) tokens.push_back(token);
-            tokens.push_back(std::string(1, c));
-            token = "";
-            continue;
+            if(!isQuoteOpen) {
+                if (token.length() > 0) tokens.push_back(token);
+                tokens.push_back(std::string(1, c));
+                token = "";
+                continue;
+            }
+        } else if (c == ',') {
+            if(!isQuoteOpen) {
+                if (token.length() > 0) tokens.push_back(token);
+                tokens.push_back(",");
+                token = "";
+                continue;
+            }
+        } else if (c == '+' || c == '-' || c == '*' || c == '/') {
+            if(!isQuoteOpen) {
+                if (token.length() > 0) tokens.push_back(token);
+                tokens.push_back(std::string(1, c));
+                token = "";
+                continue;
+            }
         } else if (c == ' ') {
             if(!isQuoteOpen) {
                 if (token.length() > 0) tokens.push_back(token);

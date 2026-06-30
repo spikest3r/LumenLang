@@ -1,0 +1,27 @@
+width = 0
+height = 0
+wallHeight = 0
+print 'Width? '
+inputInt &width
+print 'Height? '
+inputInt &height
+print 'Wall Height? '
+inputInt &wallHeight
+subArea = 0
+print 'Window + door area to subtract? '
+inputInt &subArea
+area = 2 * (width + height) * wallHeight - subArea
+areaPerCan = 0
+litersInCan = 0
+print 'Liters in can? '
+inputInt &litersInCan
+print 'Area per can? '
+inputInt &areaPerCan
+cansTotal = area / areaPerCan
+litersTotal = cansTotal * litersInCan
+print 'Wall area: '
+println area
+print 'Liters: '
+println litersTotal
+print 'Cans needed: '
+println cansTotal

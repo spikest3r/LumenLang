@@ -1,0 +1,3 @@
+label repeat
+println 'Hello, world!'
+jump repeat

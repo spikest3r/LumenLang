@@ -101,6 +101,13 @@ int execute(
                     }
                 }
                 break;
+            case 0x05:
+                {
+                    auto newPC = bytecode[PC + 1];
+                    PC = newPC;
+                    continue;
+                }
+                break;
             case 0xA0: { // ADD
                 Variant b = stack.back(); stack.pop_back();
                 Variant a = stack.back(); stack.pop_back();

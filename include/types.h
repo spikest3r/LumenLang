@@ -16,5 +16,7 @@ typedef enum {
     NONE,
     ASSIGN,
     FUNC_CALL,
-    PUSH_STACK
+    PUSH_STACK,
+    LABEL,
+    JUMP
 } Operation;
