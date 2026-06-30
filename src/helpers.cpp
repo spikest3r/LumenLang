@@ -58,6 +58,7 @@ int getOpCodeOffset(int opcode) {
         case 0xB3: // >=
         case 0xB4: // <=
         case 0xB5: // != 
+        case 0x05:
             return 2;
         case 0xFF:
         case 0xA0:

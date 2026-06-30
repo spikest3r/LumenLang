@@ -12,7 +12,7 @@ Work in progress
 | `0x01` | `RESERVED` | Reserved for future use |
 | `0x02` | `POP_VAR` | Pop top of stack and store into variable |
 | `0x03` | `PUSH_VAR` | Push variable value onto stack |
-| `0x04` | `CALL` | Call internal function |
+| `0x04` | `EXEC` | Call internal function |
 | `0x05` | `JUMP` | Unconditional jump to address |
 | `0xA0` | `ADD` | Pop two values, add them, push result |
 | `0xA1` | `SUB` | Pop two values, subtract them, push result |

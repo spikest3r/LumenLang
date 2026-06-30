@@ -1,8 +1,6 @@
-#include "includes.h"
-#include "helpers.h"
 #include "compiler.h"
-#include "types.h"
 #include "vm.h"
+#include "disassembler.h"
 #include "programfile.h"
 
 int stringIndex = 0;
@@ -18,19 +16,32 @@ int main(int argc, char** argv) {
     bool verboseFlag = false;
     bool compileFlag = false;
     bool runFlag = false;
+    bool disassembleFlag = false;
 
     if(argc > 2) {
         for(int i = 2; i < argc; i++) {
             auto arg = argv[i];
             if(strcmp(arg, "--verbose") == 0) verboseFlag = true;
             if(strcmp(arg, "--compile") == 0) compileFlag = true;
+            if(strcmp(arg, "--disassemble") == 0) disassembleFlag = true;
             if(strcmp(arg, "--run") == 0) runFlag = true;
         }
     }
 
-    if(!compileFlag && !runFlag) {
+    if(!compileFlag && !runFlag && !disassembleFlag) {
         compileFlag = true;
         runFlag = true;
+    }
+
+    if(disassembleFlag && (runFlag || compileFlag)) {
+        std::cerr << "Cannot compile/run in diassemble mode!" << std::endl;
+        return -1;
+    }
+
+    if(disassembleFlag) {
+        BinaryProgram inProg;
+        inProg.load(file_name);
+        disassemble(inProg.bytecode);
     }
 
     if(compileFlag) {
