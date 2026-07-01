@@ -4,6 +4,33 @@ int64_t getInt(const Variant& v) {
     return std::get<int64_t>(v.data);
 }
 
+using NativeFn = std::function<void(std::vector<Variant>&, std::vector<Variant>&)>;
+
+std::unordered_map<int, NativeFn> funcMap = {
+    {0x01, [](std::vector<Variant>& stack, std::vector<Variant>& variables) {
+        auto arg0 = stack.back(); stack.pop_back();
+        std::visit([](const auto& val) { std::cout << val; }, arg0.data);
+        std::cout << std::endl;
+    }},
+    {0x02, [](std::vector<Variant>& stack, std::vector<Variant>& variables) {
+        auto arg0 = stack.back(); stack.pop_back();
+        std::visit([](const auto& val) { std::cout << val; }, arg0.data);
+    }},
+    {0x03, [](std::vector<Variant>& stack, std::vector<Variant>& variables) {
+        auto varIndex = getInt(stack.back()); stack.pop_back();
+        std::string input;
+        std::cin >> input;
+        int64_t result = 0;
+        try {
+            result = std::stoll(input);
+        } catch(...) {
+            std::cout << "Invalid value!" << std::endl;
+        }
+        variables[varIndex].type = TAG_INT;
+        variables[varIndex].data = result;
+    }}
+};
+
 int execute(
     const std::vector<int>& bytecode,
     const std::vector<std::string>& stringPool,
@@ -49,41 +76,17 @@ int execute(
                     }
                 }
                 break;
-            case 0x04:
-                {
-                    // TODO: Offload to lookup map function
-                    auto functionIndex = bytecode[PC + 1];
-                    switch(functionIndex) {
-                        case 1:
-                        case 2:
-                            {
-                                auto arg0 = stack.back();
-                                stack.pop_back();
-                                std::visit([](const auto& val) {
-                                    std::cout << val;
-                                }, arg0.data);
-                                if(functionIndex == 1) std::cout << std::endl;
-                            }
-                            break;
-                        case 3:
-                            {
-                                std::string input;
-                                auto arg0 = getInt(stack.back()); // holds variable index
-                                stack.pop_back();
-                                std::cin >> input;
-                                int result = 0;
-                                try {
-                                    result = std::atoi(input.c_str());
-                                } catch(...) {
-                                    std::cout << "Invalid value!" << std::endl;
-                                }
-                                variables[arg0].type = TAG_INT;
-                                variables[arg0].data = result;
-                            }
-                            break;
-                    }
+            case 0x04: {
+                auto functionIndex = bytecode[PC + 1];
+                auto it = funcMap.find(functionIndex);
+                if (it != funcMap.end()) {
+                    it->second(stack, variables);
+                } else {
+                    std::cerr << "Unknown function index: " << functionIndex << std::endl;
+                    return -1;
                 }
                 break;
+            }
             case 0x05:
                 {
                     auto newPC = bytecode[PC + 1];
