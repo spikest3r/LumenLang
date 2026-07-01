@@ -1,0 +1,26 @@
+gpioInit 25
+gpioSetDir 25 1
+
+wait = 500
+
+direction = 1
+increment = 100
+
+label loop
+
+gpioPut 25 1
+sleepMs wait
+gpioPut 25 0
+sleepMs wait
+
+wait = wait + increment * direction
+if wait >= 1000
+direction = -1
+endif
+if wait <= 100
+direction = 1
+endif
+
+println wait
+
+jump loop

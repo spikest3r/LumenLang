@@ -17,6 +17,7 @@ int main(int argc, char** argv) {
     bool compileFlag = false;
     bool runFlag = false;
     bool disassembleFlag = false;
+    bool picoFlag = false;
 
     if(argc > 2) {
         for(int i = 2; i < argc; i++) {
@@ -25,6 +26,7 @@ int main(int argc, char** argv) {
             if(strcmp(arg, "--compile") == 0) compileFlag = true;
             if(strcmp(arg, "--disassemble") == 0) disassembleFlag = true;
             if(strcmp(arg, "--run") == 0) runFlag = true;
+            if(strcmp(arg, "--pico") == 0) picoFlag = true;
         }
     }
 
@@ -54,7 +56,7 @@ int main(int argc, char** argv) {
         int status = compile(
             file_name, 
             bytecode, variableMap, stringPool, stringPoolMap, 
-            variableIndex, stringIndex, verboseFlag
+            variableIndex, stringIndex, verboseFlag, picoFlag
         );
 
         if(status != 0) {

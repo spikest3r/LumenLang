@@ -2,6 +2,8 @@
 
 A small stack-based script compiler and virtual machine written in C++.
 
+### This branch implements VM for Raspberry Pi Pico.
+
 ## Overview
 
 This project compiles a simple scripting language into bytecode and executes it with a custom virtual machine. The interpreter supports variables, arithmetic expressions, conditionals, labels and jumps, string output, and integer input.
@@ -67,6 +69,12 @@ Examples:
 ./interpreter examples/fizzbuzz.script --verbose
 ```
 
+- Run in Raspberry Pi Pico mode:
+
+```bash
+./interpreter examples/pico/blinky.script --pico
+```
+
 ## Language syntax
 
 ### Variables
@@ -125,6 +133,16 @@ label start
 - `println <value>` — print a value and newline
 - `print <value>` — print a value without newline
 - `inputInt &<variable>` — read an integer into a variable
+
+### Raspberry Pi Pico specific functions
+- `gpioInit <pin>` — initialize a GPIO pin
+- `gpioSetDir <pin> <direction>` — set GPIO direction (`1` for output, `0` for input)
+- `gpioPut <pin> <value>` — write a digital value to a pin
+- `gpioGet <pin> &<variable>` — read a digital pin into a variable
+- `sleepMs <ms>` — pause execution for the given milliseconds
+- `gpioPullUp <pin>` — enable pull-up resistor on a pin
+- `gpioPullDown <pin>` — enable pull-down resistor on a pin
+
 
 ## Testing
 

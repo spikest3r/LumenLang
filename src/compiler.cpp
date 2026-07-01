@@ -30,6 +30,16 @@ std::unordered_map<std::string, int> funcList = {
     {"inputInt", 0x03}
 };
 
+std::map<std::string, int> picoFuncList = {
+    {"gpioInit", 0x04},
+    {"gpioSetDir", 0x05},
+    {"gpioPut", 0x06},
+    {"sleepMs", 0x07},
+    {"gpioGet", 0x08},
+    {"gpioPullUp", 0x09},
+    {"gpioPullDown", 0x0A}
+};
+
 void printError(std::string error, int line) {
     std::cerr << "Error on line " << line << std::endl << "  >>> " << error << std::endl;
 }
@@ -62,8 +72,15 @@ int compile(std::string fileName,
     std::vector<int>& bytecode,
     std::unordered_map<std::string, int>& variableMap,
     std::vector<std::string>& stringPool, std::unordered_map<std::string, int>& stringPoolMap,
-    int& variableIndex, int& stringIndex, bool verbose
+    int& variableIndex, int& stringIndex, bool verbose, bool picoMode
 ) {
+    if(picoMode) {
+        // Add pico-vm specific functions to the function list
+        for(const auto& it : picoFuncList) {
+            funcList[it.first] = it.second;
+        }
+    }
+
     std::ifstream file(fileName);
     std::string line;
 

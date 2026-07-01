@@ -3,3 +3,4 @@ main
 interpreter
 *.bin
 examples/*.bin
+/bin2h

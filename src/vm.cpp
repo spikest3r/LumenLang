@@ -82,8 +82,12 @@ int execute(
                 if (it != funcMap.end()) {
                     it->second(stack, variables);
                 } else {
-                    std::cerr << "Unknown function index: " << functionIndex << std::endl;
-                    return -1;
+                    if(functionIndex > 0x03 && functionIndex < 0x0B) { // 0x04 to 0x0A are pico-vm specific functions
+                        std::cerr << "Pico VM: " << functionIndex << std::endl;
+                    } else {
+                        std::cerr << "Unknown function index: " << functionIndex << std::endl;
+                        return -1;
+                    }
                 }
                 break;
             }
