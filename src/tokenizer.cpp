@@ -51,6 +51,9 @@ std::vector<std::string> tokenizeFormula(std::string formula) {
                 token = "";
                 continue;
             }
+        } else if(c == '#') {
+            // comment
+            break;
         }
         token += c;
     }

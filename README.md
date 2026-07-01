@@ -69,6 +69,15 @@ Examples:
 
 ## Language syntax
 
+### Comments
+
+Only one-line comments are available for now.
+
+```
+# One-line comment
+println 'Hello, world!' # This is a comment
+```
+
 ### Variables
 
 Assign values to variables with `=`:
