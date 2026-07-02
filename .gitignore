@@ -4,3 +4,5 @@ interpreter
 *.bin
 examples/*.bin
 /bin2h
+*.dbg
+examples/*.dbg

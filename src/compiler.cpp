@@ -62,7 +62,7 @@ int compile(std::string fileName,
     std::vector<int>& g_bytecode,
     std::unordered_map<std::string, int>& variableMap,
     std::vector<std::string>& stringPool, std::unordered_map<std::string, int>& stringPoolMap,
-    int& variableIndex, int& stringIndex, bool verbose
+    int& variableIndex, int& stringIndex, bool verbose, bool debugInfo
 ) {
     std::ifstream file(fileName);
     std::string line;
@@ -191,11 +191,6 @@ int compile(std::string fileName,
                         ); // result in stack
                         fromStack = true;
                     }
-                    compileExpression(
-                        formula, bytecode,
-                        variableMap, variableIndex
-                    ); // result in stack
-                    fromStack = true;
                 }
                 if(op != NONE) {
                     printError("Syntax error", lineIndex);
@@ -455,6 +450,27 @@ int compile(std::string fileName,
         } else {
             printError("Subroutine '" + keyword + "' is not defined", line);
             return -1;
+        }
+    }
+
+    if(debugInfo) {
+        std::ofstream debugFile(fileName + ".bin.dbg");
+        // write variable names and their indices
+        debugFile << "variables" << std::endl;
+        for(const auto& var : variableMap) {
+            debugFile << var.first << " " << var.second << std::endl;
+        }
+        // write subroutine names, their bytecode offsets and bytecode length
+        debugFile << "routines" << std::endl;
+        for(const auto& sub : subroutineIndexMap) {
+            debugFile << sub.first << std::endl;
+            debugFile << routineOffsets[sub.second] - 1 << std::endl;
+            debugFile << subroutineBytecode[sub.second].size() << std::endl;
+        }
+        // write exec functions
+        debugFile << "exec" << std::endl;
+        for(const auto& func: funcList) {
+            debugFile << func.first << " " << func.second << std::endl;
         }
     }
 

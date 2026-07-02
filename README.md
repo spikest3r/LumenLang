@@ -166,6 +166,7 @@ A basic test script is available at `test.sh`.
 
 | Opcode | Instruction | Description |
 |-------:|-------------|-------------|
+| `0x01` | `CALL` | Call user-defined subroutine |
 | `0x02` | `POP` | Pop top of stack into variable |
 | `0x03` | `PUSH` | Push literal, variable or string to stack |
 | `0x04` | `EXEC` | Call built-in function |
