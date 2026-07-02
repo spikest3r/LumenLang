@@ -96,6 +96,14 @@ print 'Hello, world'
 println 'done'
 ```
 
+Concatenate stings:
+
+```text
+mystr = 'He' .. 'llo'
+result = mystr .. ' world'
+println result
+```
+
 ### Input
 
 Read an integer from stdin into a variable:
@@ -163,4 +171,5 @@ A basic test script is available at `test.sh`.
 | `0xB3` | `JGE` | Jump if greater or equal |
 | `0xB4` | `JLE` | Jump if less or equal |
 | `0xB5` | `JNE` | Jump if not equal |
+| `0xAA` | `JOIN` | Concatenate strings from stack |
 | `0xFF` | `HLT` | Halt execution |

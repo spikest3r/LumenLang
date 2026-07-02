@@ -26,6 +26,8 @@ std::map<int, std::string> disassemblyMap = {
     {0xB4, "JLE"},
     {0xB5, "JNE"},
 
+    {0xAA, "JOIN"},
+
     {0xFF, "HLT"}
 };
 

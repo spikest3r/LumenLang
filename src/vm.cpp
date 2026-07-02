@@ -51,8 +51,16 @@ int execute(
             case 0x02:
                 {
                     auto varIndex = bytecode[PC + 1];
-                    variables[varIndex].type = static_cast<TypeTag>(TAG_INT);
-                    variables[varIndex].data = getInt(stack.back());
+                    auto var = stack.back();
+                    variables[varIndex].type = var.type;
+                    switch(var.type) {
+                        case TAG_INT:
+                            variables[varIndex].data = std::get<int64_t>(var.data);
+                            break;
+                        case TAG_STRING:
+                            variables[varIndex].data = std::get<std::string>(var.data);
+                            break;
+                    }
                     stack.pop_back();
                 }
                 break;
@@ -176,6 +184,17 @@ int execute(
                     PC = falseIndex;
                     continue;
                 }
+                break;
+            }
+            case 0xAA: { // join strings
+                int strCount = getInt(stack.back()); stack.pop_back();
+                std::string result;
+                for(int i = 0; i < strCount; i++) {
+                    Variant strVar = stack.back(); stack.pop_back();
+                    std::string str = std::get<std::string>(strVar.data);
+                    result = str + result; // prepend to maintain order
+                }
+                stack.push_back({TAG_STRING, result});
                 break;
             }
             case 0xFF:
