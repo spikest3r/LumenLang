@@ -46,8 +46,6 @@ int resolveString(std::string str, std::vector<std::string>& stringPool, std::un
 
 int getOpCodeOffset(int opcode) {
     switch(opcode) {
-        // case 0x01:
-        //     return 4;
         case 0x03:
             return 3;
         case 0x04:
@@ -59,6 +57,7 @@ int getOpCodeOffset(int opcode) {
         case 0xB4: // <=
         case 0xB5: // != 
         case 0x05:
+        case 0x01:
             return 2;
         case 0xFF:
         case 0xA0:
@@ -67,9 +66,11 @@ int getOpCodeOffset(int opcode) {
         case 0xA3:
         case 0xA4:
         case 0xA5:
+        case 0xAA:
+        case 0xFE:
             return 1;
     }
-    return 0;
+    return 1;
 }
 
 bool isVar(const std::string &s) {

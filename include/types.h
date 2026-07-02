@@ -19,7 +19,8 @@ typedef enum {
     PUSH_STACK,
     LABEL,
     JUMP,
-    IF, ELSE
+    IF, ELSE,
+    SUBROUTINE
 } Operation;
 
 typedef enum {

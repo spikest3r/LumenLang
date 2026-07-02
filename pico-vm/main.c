@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 #define UART_ID uart1
 #define BAUD_RATE 115200
@@ -90,8 +91,6 @@ int loadFromFlash(const uint32_t* data, int dataSize) {
 
 int getOpCodeOffset(int opcode) {
     switch(opcode) {
-        // case 0x01:
-        //     return 4;
         case 0x03:
             return 3;
         case 0x04:
@@ -103,6 +102,7 @@ int getOpCodeOffset(int opcode) {
         case 0xB4: // <=
         case 0xB5: // != 
         case 0x05:
+        case 0x01:
             return 2;
         case 0xFF:
         case 0xA0:
@@ -111,6 +111,8 @@ int getOpCodeOffset(int opcode) {
         case 0xA3:
         case 0xA4:
         case 0xA5:
+        case 0xAA:
+        case 0xFE:
             return 1;
     }
     return 0;
@@ -226,7 +228,9 @@ int execute(
 ) {
     Variant variables[16];
     Variant stack[16];
+    int pcStack[8];
     int stackPointer = -1;
+    int pcStackPointer = -1;
     int PC = 0;
     int halt = 0;
 
@@ -234,11 +238,29 @@ int execute(
         int opcode = bytecode[PC];
         int offset = getOpCodeOffset(opcode);
         switch(opcode) {
+            case 0x01: {
+                int addr = bytecode[PC + 1];
+                pcStack[++pcStackPointer] = PC + offset;
+                PC = addr;
+                continue;
+            }
+            case 0xFE: {
+                if(pcStackPointer < 0) return -1;
+                PC = pcStack[pcStackPointer--];
+                continue;
+            }
             case 0x02: {
                 int varIndex = bytecode[PC + 1];
                 if(stackPointer < 0) return -1;
-                variables[varIndex].type = TAG_INT;
-                variables[varIndex].data.i = stack[stackPointer].data.i;
+                variables[varIndex].type = stack[stackPointer].type;
+                switch(stack[stackPointer].type) {
+                    case TAG_INT:
+                        variables[varIndex].data.i = stack[stackPointer].data.i;
+                        break;
+                    case TAG_STRING:
+                        variables[varIndex].data.str = stack[stackPointer].data.str;
+                        break;
+                }
                 stackPointer--;
                 break;
             }
@@ -348,6 +370,35 @@ int execute(
                     PC = falseIndex;
                     continue;
                 }
+                break;
+            }
+            case 0xAA: {
+                int strCount = stack[stackPointer].data.i; stackPointer--;
+
+                size_t totalLen = 0;
+                for(int i = 0; i < strCount; i++) {
+                    totalLen += strlen(stack[stackPointer - i].data.str);
+                }
+
+                char* result = malloc(totalLen + 1);
+                if(!result) return -1;
+
+                char *dst = result;
+
+                for(int i = strCount - 1; i >= 0; i--) {
+                    char *src = stack[stackPointer-i].data.str;
+                    while(*src)
+                        *dst++ = *src++;
+                }
+
+                *dst = '\0';
+
+                stackPointer -= strCount;
+
+                stackPointer++;
+                stack[stackPointer].type = TAG_STRING;
+                stack[stackPointer].data.str = result;
+
                 break;
             }
             case 0xFF:

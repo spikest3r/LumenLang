@@ -104,6 +104,30 @@ print 'Hello, world'
 println 'done'
 ```
 
+Concatenate stings:
+
+```text
+mystr = 'He' .. 'llo'
+result = mystr .. ' world'
+println result
+```
+
+### Raspberry Pi Pico
+
+#### GPIO Manipulation
+```text
+gpioInit 25 # Init built-in LED
+gpioInit 2 # Init GPIO 2 (for example, button)
+
+gpioSetDir 25 1 # Set GPIO 25 direction output
+gpioSetDir 2 0 # Set GPIO 2 direction input
+
+gpioPut 25 1 # Digital write 1 to GPIO 25
+
+value = 0
+gpioGet 2 &value # Digital read from GPIO 2
+```
+
 ### Input
 
 Read an integer from stdin into a variable:
@@ -130,6 +154,17 @@ label start
     if i <= 10
         jump start
     endif
+```
+
+### Subroutines
+
+```text
+routines sayhello
+println 'Hello, world!'
+endroutine
+
+println 'My routine'
+call sayhello
 ```
 
 ### Operators
@@ -165,6 +200,7 @@ A basic test script is available at `test.sh`.
 
 | Opcode | Instruction | Description |
 |-------:|-------------|-------------|
+| `0x01` | `CALL` | Call user-defined subroutine |
 | `0x02` | `POP` | Pop top of stack into variable |
 | `0x03` | `PUSH` | Push literal, variable or string to stack |
 | `0x04` | `EXEC` | Call built-in function |
@@ -181,4 +217,5 @@ A basic test script is available at `test.sh`.
 | `0xB3` | `JGE` | Jump if greater or equal |
 | `0xB4` | `JLE` | Jump if less or equal |
 | `0xB5` | `JNE` | Jump if not equal |
+| `0xAA` | `JOIN` | Concatenate strings from stack |
 | `0xFF` | `HLT` | Halt execution |

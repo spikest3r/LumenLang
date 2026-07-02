@@ -69,10 +69,10 @@ void pushToStack(std::string token, std::vector<int>& bytecode,
 }
 
 int compile(std::string fileName, 
-    std::vector<int>& bytecode,
+    std::vector<int>& g_bytecode,
     std::unordered_map<std::string, int>& variableMap,
     std::vector<std::string>& stringPool, std::unordered_map<std::string, int>& stringPoolMap,
-    int& variableIndex, int& stringIndex, bool verbose, bool picoMode
+    int& variableIndex, int& stringIndex, bool verbose, bool debugInfo, bool picoMode
 ) {
     if(picoMode) {
         // Add pico-vm specific functions to the function list
@@ -85,6 +85,9 @@ int compile(std::string fileName,
     std::string line;
 
     std::unordered_map<std::string, int> jumpTable;
+    std::unordered_map<int, std::vector<int>> subroutineBytecode;
+    std::unordered_map<std::string, int> subroutineIndexMap;
+    std::vector<UnresolvedJump> unresolvedRoutineCalls;
     std::vector<UnresolvedJump> unresolvedJumps;
     std::vector<int> condJumpStack;
 
@@ -92,6 +95,9 @@ int compile(std::string fileName,
     std::vector<bool> elseDefined;
 
     int lineIndex = 1; // for user messages
+    bool inRoutine = 0;
+    int routineIndex = -1;
+    int routineCount = 0;
 
     while (std::getline(file, line)) {
         if(verbose) std::cout << line << std::endl;
@@ -108,19 +114,101 @@ int compile(std::string fileName,
         int conditionArgs = 0;
         int varIndex_assign = 0;
         ConditionOp condOp = COP_NONE;
+        std::vector<int>& bytecode = inRoutine ? subroutineBytecode[routineIndex] : g_bytecode;
         for(const auto& token: tokens) {
             if(token == "=") {
                 bool fromStack = false;
                 if(tokens.size() > 3) {
                     std::string formula;
+                    std::vector<std::string> strs;
+                    bool allStr = false;
+                    bool mixed = false;
                     for(int i = 2; i < tokens.size(); i++) {
-                        formula += tokens[i];
+                        auto t = tokens[i];
+                        if(t == "..") {
+                            if(mixed) {
+                                printError("Syntax error", lineIndex);
+                                return -1;
+                            } else {
+                                allStr = true;
+                            }
+                        } else if(t == "+" || t == "-" || t == "*" || t == "/" || t == "%" || t == "^") {
+                            if(allStr) {
+                                printError("Syntax error", lineIndex);
+                                return -1;
+                            } else {
+                                mixed = true;
+                            }
+                        }
                     }
-                    compileExpression(
-                        formula, bytecode,
-                        variableMap, variableIndex
-                    ); // result in stack
-                    fromStack = true;
+                    mixed = false;
+                    for(int i = 2; i < tokens.size(); i++) {
+                        bool isStr = false;
+                        if(tokens[i].starts_with("'")) {
+                            isStr = true;
+                            if(!allStr && !mixed) {
+                                allStr = true;
+                            } else if(!allStr && mixed) {
+                                printError("Syntax error", lineIndex);
+                                return -1;
+                            }
+                        } else {
+                            bool var = false;
+                            if(allStr) {
+                                var = isVar(tokens[i]);
+                                isStr = var;
+                            }
+                            if(!var) {
+                                if(tokens[i] != "..") {
+                                    if(allStr && !mixed) {
+                                        mixed = true;
+                                    } else if(allStr && mixed) {
+                                        printError("Syntax error", lineIndex);
+                                        return -1;
+                                    }
+                                }
+                            }
+                        }
+
+                        if(isStr) {
+                            if(tokens[i] != "..") {
+                                strs.push_back(tokens[i]);
+                            }
+                        } else {
+                            formula += tokens[i];
+                        }
+                    }
+                    if(allStr) {
+                        for(const auto& str: strs) {
+                            bytecode.push_back(0x03); // push to stack
+                            if(isVar(str)) {
+                                bytecode.push_back(0x03); // variable
+                                auto varIndex = resolveVariableIndex(str, variableMap, variableIndex);
+                                bytecode.push_back(varIndex); // variable index
+                            } else {
+                                auto strIndex = resolveString(str, stringPool, stringPoolMap, stringIndex);
+                                bytecode.push_back(0x01); // string
+                                bytecode.push_back(strIndex); // string index
+                            }
+                        }
+                        
+                        // push str count
+                        bytecode.push_back(0x03); // push to stack
+                        bytecode.push_back(0x02); // int
+                        bytecode.push_back(strs.size()); // value
+
+                        bytecode.push_back(0xAA); // join strings
+                        fromStack = true;
+                    } else if(mixed) {
+                        printError("Syntax error", lineIndex);
+                        return -1;
+                    } else {
+                        compileExpression(
+                            formula, bytecode,
+                            variableMap, variableIndex
+                        ); // result in stack
+                        fromStack = true;
+                    }
                 }
                 if(op != NONE) {
                     printError("Syntax error", lineIndex);
@@ -181,6 +269,44 @@ int compile(std::string fileName,
                 condJumpStack.push_back(bytecode.size() - 1); // now track the else's skip-jump
                 continue;
             }
+            else if(token == "halt") {
+                if(op != NONE) {
+                    printError("Syntax error", lineIndex);
+                    return -1;
+                }
+                bytecode.push_back(0xFF);
+                continue;
+            } else if(token == "routine") {
+                if(op != NONE) {
+                    printError("Syntax error", lineIndex);
+                    return -1;
+                }
+                op = SUBROUTINE;
+                if(inRoutine) {
+                    printError("Nested routines are not allowed", lineIndex);
+                    return -1;
+                }
+                inRoutine = true;
+                continue;
+            } else if(token == "endroutine") {
+                if(op != NONE) {
+                    printError("Syntax error", lineIndex);
+                    return -1;
+                }
+                if(!inRoutine) {
+                    printError("Unexpected 'endroutine' (no matching 'routine')", lineIndex);
+                    return -1;
+                }
+                bytecode.push_back(0xFE); // RET
+                inRoutine = false;
+                continue;
+            } else if(token == "call") {
+                std::string routineName = tokens[1]; // name is always second token
+                bytecode.push_back(0x01);
+                bytecode.push_back(0xEE);
+                unresolvedRoutineCalls.push_back({routineName, (int)(bytecode.size() - 1), lineIndex});
+                break;
+            }
             else {
                 if(op == NONE) {
                     // match function call
@@ -200,6 +326,13 @@ int compile(std::string fileName,
             keyword = token;
 
             switch(op) {
+                case SUBROUTINE:
+                    {
+                        routineIndex = routineCount++;
+                        subroutineIndexMap[token] = routineIndex;
+                        subroutineBytecode[routineIndex] = std::vector<int>();
+                    }
+                    break;
                 case ASSIGN:
                     bytecode.push_back(0x03); // PUSH
                     if(token.starts_with("'")) { // string
@@ -297,19 +430,65 @@ int compile(std::string fileName,
         lineIndex++;
     }
 
-    bytecode.push_back(0xFF); // HALT
+    g_bytecode.push_back(0xFF); // HALT
+
+    std::unordered_map<int, int> routineOffsets;
 
     for(const auto& it : unresolvedJumps) {
+            auto keyword = it.keyword;
+            auto location = it.location;
+            auto line = it.line;
+
+            auto it2 = jumpTable.find(keyword);
+            if(it2 != jumpTable.end()) {
+                g_bytecode[location] = it2->second;
+            } else {
+                printError("Label '" + keyword + "' is not defined", line);
+                return -1;
+            }
+        }
+
+        for(const auto& it : subroutineBytecode) {
+        auto idx = it.first;
+        auto& routineBc = it.second;
+        routineOffsets[idx] = g_bytecode.size(); // offset where this routine starts
+        g_bytecode.insert(g_bytecode.end(), routineBc.begin(), routineBc.end());
+    }
+
+    for(const auto& it : unresolvedRoutineCalls) {
         auto keyword = it.keyword;
         auto location = it.location;
         auto line = it.line;
 
-        auto it2 = jumpTable.find(keyword);
-        if(it2 != jumpTable.end()) {
-            bytecode[location] = it2->second;
+        auto it2 = subroutineIndexMap.find(keyword);
+
+        if(it2 != subroutineIndexMap.end()) {
+            int rIdx = it2->second;
+            g_bytecode[location] = routineOffsets[rIdx]; // patch with actual byte offset
         } else {
-            printError("Label '" + keyword + "' is not defined", line);
+            printError("Subroutine '" + keyword + "' is not defined", line);
             return -1;
+        }
+    }
+
+    if(debugInfo) {
+        std::ofstream debugFile(fileName + ".bin.dbg");
+        // write variable names and their indices
+        debugFile << "variables" << std::endl;
+        for(const auto& var : variableMap) {
+            debugFile << var.first << " " << var.second << std::endl;
+        }
+        // write subroutine names, their bytecode offsets and bytecode length
+        debugFile << "routines" << std::endl;
+        for(const auto& sub : subroutineIndexMap) {
+            debugFile << sub.first << std::endl;
+            debugFile << routineOffsets[sub.second] - 1 << std::endl;
+            debugFile << subroutineBytecode[sub.second].size() << std::endl;
+        }
+        // write exec functions
+        debugFile << "exec" << std::endl;
+        for(const auto& func: funcList) {
+            debugFile << func.first << " " << func.second << std::endl;
         }
     }
 
