@@ -1,3 +1,41 @@
-mystr = 'He' .. 'llo'
-result = mystr .. ' world'
+temp = 0
+result = 0
+
+routine c2f
+result = temp * 9 / 5 + 32
+endroutine
+
+routine f2c
+result = temp - 32
+result = result * 5 / 9
+endroutine
+
+routine ask
+print 'Temparature: '
+endroutine
+
+routine show
+print 'Result: '
 println result
+endroutine
+
+println '1. C to F'
+println '2. F to C'
+print 'Select mode '
+mode = 0
+inputInt &mode
+if mode == 1
+call ask
+inputInt &temp
+call c2f
+call show
+else
+if mode == 2
+call ask
+inputInt &temp
+call f2c
+call show
+else
+println 'Incorrect mode'
+endif
+endif

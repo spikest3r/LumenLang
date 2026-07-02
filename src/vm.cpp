@@ -40,6 +40,7 @@ int execute(
     variables.resize(variableIndex);
 
     std::vector<Variant> stack;
+    std::vector<int> pcStack;
 
     int PC = 0;
     bool halt = false;
@@ -48,6 +49,27 @@ int execute(
         auto opcode = bytecode[PC];
         int offset = getOpCodeOffset(opcode);
         switch(opcode) {
+            case 0x01:
+                // run subroutine
+                {
+                    auto addr = bytecode[PC + 1];
+                    pcStack.push_back(PC + offset);
+                    PC = addr;
+                    continue;
+                }
+                break;
+            case 0xFE:
+                // return from subroutine
+                {
+                    if(pcStack.empty()) {
+                        std::cerr << "Return stack underflow!" << std::endl;
+                        return -1;
+                    }
+                    PC = pcStack.back();
+                    pcStack.pop_back();
+                    continue;
+                }
+                break;
             case 0x02:
                 {
                     auto varIndex = bytecode[PC + 1];

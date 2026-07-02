@@ -132,6 +132,17 @@ label start
     endif
 ```
 
+### Subroutines
+
+```text
+routines sayhello
+println 'Hello, world!'
+endroutine
+
+println 'My routine'
+call sayhello
+```
+
 ### Operators
 
 - Arithmetic: `+`, `-`, `*`, `/`, `%`, `^`

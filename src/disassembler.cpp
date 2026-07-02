@@ -7,6 +7,7 @@ enum OperandType {
 };
 
 std::map<int, std::string> disassemblyMap = {
+    {0x01, "CALL"},
     {0x02, "POP"},
     {0x03, "PUSH"},
     {0x04, "EXEC"},
@@ -28,6 +29,7 @@ std::map<int, std::string> disassemblyMap = {
 
     {0xAA, "JOIN"},
 
+    {0xFE, "RET"},
     {0xFF, "HLT"}
 };
 
