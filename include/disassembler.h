@@ -2,4 +2,21 @@
 #include "includes.h"
 #include "helpers.h"
 
-void disassemble(std::vector<int> bytecode, std::vector<std::string> stringPool, std::string debugFile = "");
+struct RoutineInfo
+{
+    uint32_t offset;
+    uint32_t length;
+};
+
+void disassemble(std::vector<int> bytecode, 
+    std::vector<std::string> stringPool, 
+    std::string debugFile = "", 
+    bool* debugSymbolsLoaded = nullptr,
+    int vmPC = -1
+);
+
+bool loadDebugInfo(const std::string& fileName,
+    std::unordered_map<int, std::string>& variables,
+    std::unordered_map<std::string, RoutineInfo>& routines,
+    std::unordered_map<int, std::string>& funcList
+);

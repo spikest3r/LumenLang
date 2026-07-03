@@ -1,17 +1,5 @@
 #include "disassembler.h"
 
-enum OperandType {
-    NONE = 0,
-    TYPE = 1,
-    VALUE = 2
-};
-
-struct RoutineInfo
-{
-    uint32_t offset;
-    uint32_t length;
-};
-
 std::map<int, std::string> disassemblyMap = {
     {0x01, "CALL"},
     {0x02, "POP"},
@@ -123,7 +111,9 @@ std::unordered_map<uint32_t, std::string> buildRoutineStarts(
     return routineStarts;
 }
 
-void disassemble(std::vector<int> bytecode, std::vector<std::string> stringPool, std::string debugFile) {
+void disassemble(std::vector<int> bytecode, std::vector<std::string> stringPool, 
+    std::string debugFile, bool* debugSymbolsLoaded, int vmPC
+) {
     int PC = 0;
     int size = bytecode.size();
 
@@ -135,15 +125,30 @@ void disassemble(std::vector<int> bytecode, std::vector<std::string> stringPool,
 
     if(debugFile != "") {
         std::cout << "Loading debug info from " << debugFile << std::endl;
-        loadDebugInfo(debugFile, variables_debug, routines_debug, funcList_debug);
-        routineStarts = buildRoutineStarts(routines_debug);
-        hasDebugData = true;
+        bool success = loadDebugInfo(debugFile, variables_debug, routines_debug, funcList_debug);
+        if(success) {
+            routineStarts = buildRoutineStarts(routines_debug);
+            hasDebugData = true;
+            if(debugSymbolsLoaded) *debugSymbolsLoaded = true;
+        } else {
+            if(debugSymbolsLoaded) *debugSymbolsLoaded = false;
+        }
     }
+
+    bool pointMode = vmPC != -1;
 
     std::cout << "===== Main =====" << std::endl;
     
     while(PC < size) {
         auto offset = getOpCodeOffset(bytecode[PC]);
+
+        if(pointMode) {
+            if (vmPC == PC) {
+                std::cout << "PC -> ";
+            } else {
+                std::cout << "      ";
+            }
+        }
 
         std::cout << "0x" << std::hex << std::right << std::setw(8) << std::setfill('0') << PC << ": ";
 
@@ -173,29 +178,39 @@ void disassemble(std::vector<int> bytecode, std::vector<std::string> stringPool,
                 switch(byte) {
                     case 0x01: // CALL
                         {
-                            auto rt = routineStarts[bytecode[PC + 1] - 1];
-                            std::cout << " " << rt << " (0x" 
-                                    << std::hex << std::right << std::setw(8) << std::setfill('0')
-                                    << static_cast<int>(bytecode[i]) << ")";
+                            if(hasDebugData) {
+                                auto rt = routineStarts[bytecode[PC + 1] - 1];
+                                std::cout << " " << rt << " (0x" 
+                                        << std::hex << std::right << std::setw(8) << std::setfill('0')
+                                        << static_cast<int>(bytecode[i]) << ")";
+                            } else {
+                                std::cout << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
+                            }
                         }
                         break;
                     case 0x02: // POP
-                        std::cout << " " << variables_debug[bytecode[PC + 1]];
+                        if(hasDebugData) std::cout << " " << variables_debug[bytecode[PC + 1]];
+                        else std::cout << " " << std::dec << static_cast<int>(bytecode[PC + 1]);
                         break;
                     case 0x03: // PUSH
                         if(j < 1) {
                             if(bytecode[PC + 1] == 0x01) {
                                 std::cout << " '" << stringPool[bytecode[PC + 2]] << "'";
-                            } else if(bytecode[PC + 1] == 0x02) {
+                            } else if(hasDebugData) { 
+                                if(bytecode[PC + 1] == 0x02) {
+                                    std::cout << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
+                                } else if(bytecode[PC + 1] == 0x03) {
+                                    std::cout << " " << variables_debug[bytecode[PC + 2]];
+                                }
+                            } else {
                                 std::cout << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
-                            } else if(bytecode[PC + 1] == 0x03) {
-                                std::cout << " " << variables_debug[bytecode[PC + 2]];
                             }
                         }
                         break;
                     case 0x04: // EXEC
                         {
-                            std::cout << " " << funcList_debug[bytecode[PC + 1]];
+                            if(hasDebugData) std::cout << " " << funcList_debug[bytecode[PC + 1]];
+                            else std::cout << " " << std::dec << static_cast<int>(bytecode[PC + 1]);
                         }
                         break;
                     default:

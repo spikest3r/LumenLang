@@ -81,3 +81,14 @@ bool isVar(const std::string &s) {
     }
     return true;
 }
+
+std::string variantToString(const Variant& v) {
+    switch (v.type) {
+        case TAG_INT:
+            return std::to_string(std::get<int64_t>(v.data));
+        case TAG_STRING:
+            return "'" + std::get<std::string>(v.data) + "'";
+        default:
+            return "<unknown type>";
+    }
+}

@@ -13,6 +13,7 @@ This project compiles a simple scripting language into bytecode and executes it 
 - Compile script files into `.bin` bytecode files
 - Execute compiled bytecode directly
 - Disassemble binary bytecode for debugging
+- Built-in debugger with breakpoint, and stack/variable trace,
 - Built-in functions: `println`, `print`, `inputInt`
 - Arithmetic operators: `+`, `-`, `*`, `/`, `%`, `^`
 - Comparison operators: `==`, `!=`, `>`, `<`, `>=`, `<=`
@@ -28,6 +29,15 @@ This project compiles a simple scripting language into bytecode and executes it 
 From the repository root:
 
 ```bash
+mkdir build
+cd build
+cmake ..
+make -j($nproc)
+```
+
+Compile bin2h tool:
+```bash
+cd pico-vm
 ./compile
 ```
 
@@ -63,16 +73,29 @@ Examples:
 ./interpreter examples/fizzbuzz.script.bin --disassemble
 ```
 
+- Run script with debugger
+
+```bash
+./interpreter examples/fizzbuzz.script --debugger
+```
+
+- Run precompiled binary with debugger
+
+```bash
+./interpreter examples/fizzbuzz.script.bin --run --debugger
+```
+
 - Enable verbose mode:
 
 ```bash
 ./interpreter examples/fizzbuzz.script --verbose
 ```
 
-- Run in Raspberry Pi Pico mode:
+- Run in Raspberry Pi Pico mode and prepare binary:
 
 ```bash
 ./interpreter examples/pico/blinky.script --pico
+./bin2h examples/pico/blinky.script.bin program.h
 ```
 
 ## Language syntax
