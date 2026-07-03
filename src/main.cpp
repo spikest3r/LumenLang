@@ -14,7 +14,8 @@ int main(int argc, char** argv) {
         std::cout << "  --compile      Compile the source file (default)" << std::endl;
         std::cout << "  --run          Run the compiled bytecode (default)" << std::endl;
         std::cout << "  --disassemble  Disassemble the compiled bytecode" << std::endl;
-        std::cout << "  --debug        Generate debug information file" << std::endl;
+        std::cout << "  --dbgsym       Generate debug symbols information file" << std::endl;
+        std::cout << "  --debugger     Run file in debugger mode" << std::endl;
         std::cout << "If no options are provided, the program will compile and run the source file." << std::endl;
         return -1;
     }
@@ -25,6 +26,7 @@ int main(int argc, char** argv) {
     bool runFlag = false;
     bool disassembleFlag = false;
     bool debugInfo = false;
+    bool debuggerActive = false;
 
     if(argc > 2) {
         for(int i = 2; i < argc; i++) {
@@ -33,7 +35,8 @@ int main(int argc, char** argv) {
             else if(strcmp(arg, "--compile") == 0) compileFlag = true;
             else if(strcmp(arg, "--disassemble") == 0) disassembleFlag = true;
             else if(strcmp(arg, "--run") == 0) runFlag = true;
-            else if(strcmp(arg, "--debug") == 0) debugInfo = true;
+            else if(strcmp(arg, "--dbgsym") == 0) debugInfo = true;
+            else if(strcmp(arg, "--debugger") == 0) debuggerActive = true;
             else {
                 std::cerr << "Unknown argument: " << arg << std::endl;
                 return -1;
@@ -48,6 +51,14 @@ int main(int argc, char** argv) {
 
     if(disassembleFlag && (runFlag || compileFlag)) {
         std::cerr << "Cannot compile/run in diassemble mode!" << std::endl;
+        return -1;
+    }
+
+    if(
+        (debuggerActive && compileFlag && !runFlag) ||
+        (debugInfo && !compileFlag)
+    ) {
+        std::cerr << "Invalid flag combination" << std::endl;
         return -1;
     }
 
@@ -95,18 +106,29 @@ int main(int argc, char** argv) {
     if(runFlag) {
         std::string inFile = compileFlag ? file_name + ".bin" : file_name;
 
-        if(verboseFlag) std::cout << "Executing..." << std::endl;
-
         BinaryProgram inProg;
         inProg.load(inFile);
         
-        int status = execute(
-            inProg.bytecode,
-            inProg.stringPool,
-            inProg.variableIndex
-        );
+        int status = -1;
 
-        if(verboseFlag) std::cout << "Execution finished" << std::endl;
+        if(debuggerActive) {
+            status = run_debug(
+                file_name,
+                inProg.bytecode,
+                inProg.stringPool,
+                inProg.variableIndex
+            );
+        } else {
+            if(verboseFlag) std::cout << "Executing..." << std::endl;
+
+            status = run(
+                inProg.bytecode,
+                inProg.stringPool,
+                inProg.variableIndex
+            );
+
+            if(verboseFlag) std::cout << "Execution finished" << std::endl;
+        }
     }
 
     return 0;

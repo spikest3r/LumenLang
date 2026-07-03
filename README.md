@@ -11,6 +11,7 @@ This project compiles a simple scripting language into bytecode and executes it 
 - Compile script files into `.bin` bytecode files
 - Execute compiled bytecode directly
 - Disassemble binary bytecode for debugging
+- Built-in debugger with breakpoint, and stack/variable trace,
 - Built-in functions: `println`, `print`, `inputInt`
 - Arithmetic operators: `+`, `-`, `*`, `/`, `%`, `^`
 - Comparison operators: `==`, `!=`, `>`, `<`, `>=`, `<=`
@@ -26,7 +27,10 @@ This project compiles a simple scripting language into bytecode and executes it 
 From the repository root:
 
 ```bash
-./compile
+mkdir build
+cd build
+cmake ..
+make -j($nproc)
 ```
 
 ## Usage
@@ -59,6 +63,18 @@ Examples:
 
 ```bash
 ./interpreter examples/fizzbuzz.script.bin --disassemble
+```
+
+- Run script with debugger
+
+```bash
+./interpreter examples/fizzbuzz.script --debugger
+```
+
+- Run precompiled binary with debugger
+
+```bash
+./interpreter examples/fizzbuzz.script.bin --run --debugger
 ```
 
 - Enable verbose mode:
