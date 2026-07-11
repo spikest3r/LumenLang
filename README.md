@@ -1,244 +1,344 @@
-# Interpreter
+# LumenLang
 
-A small stack-based script compiler and virtual machine written in C++.
+A lightweight, stack-based scripting language with a custom compiler, bytecode format, and virtual machine written in C++20.
 
-### This branch implements VM for Raspberry Pi Pico.
+Lumen is designed to be simple to learn while still exposing the concepts behind real programming languages: compilation, bytecode execution, virtual machines, debugging, and optimization.
 
-## Overview
+```text
+println 'Hello, world!'
 
-This project compiles a simple scripting language into bytecode and executes it with a custom virtual machine. The interpreter supports variables, arithmetic expressions, conditionals, labels and jumps, string output, and integer input.
+name = ''
+print 'What`s your name? '
+inputStr &name
+
+greeting = 'Hello, ' .. name .. '!'
+println greeting
+```
+
+Output:
+
+```text
+Hello, world!
+What`s your name? Ryan
+Hello, Ryan!
+```
 
 ## Features
 
-- Compile script files into `.bin` bytecode files
-- Execute compiled bytecode directly
-- Disassemble binary bytecode for debugging
-- Built-in debugger with breakpoint, and stack/variable trace,
-- Built-in functions: `println`, `print`, `inputInt`
-- Arithmetic operators: `+`, `-`, `*`, `/`, `%`, `^`
-- Comparison operators: `==`, `!=`, `>`, `<`, `>=`, `<=`
-- Control flow with `if`, `else`, `endif`, `label`, and `jump`
+### Language
 
-## Requirements
+- Variables and dynamic values
+- Integer arithmetic
+- String manipulation
+- String concatenation with `..`
+- Conditional execution
+- Labels and jumps
+- User-defined routines
+- Console input/output
+- Comments
 
-- Linux or Unix-like OS
-- `g++` with C++20 support
+### Compiler & Virtual Machine
 
-## Build
+- Compile `.lmn` source files into bytecode
+- Execute precompiled bytecode files
+- Custom stack-based virtual machine
+- Bytecode disassembler
+- Debug symbol generation
+- Built-in debugger
+- Runtime tracing
+- Verbose compilation mode
 
-From the repository root:
+### Developer Experience
+
+- Interactive introduction command
+- Built-in example generator
+- Beginner-friendly CLI
+- Self-contained toolchain
+
+## Getting Started
+
+### Build
+
+Requirements:
+
+- Linux or Unix-like operating system
+- C++20 compiler
+- CMake
+
+Build from the repository root:
 
 ```bash
 mkdir build
 cd build
 cmake ..
-make -j($nproc)
+make -j$(nproc)
 ```
 
-Compile bin2h tool:
-```bash
-cd pico-vm
-./compile
-```
-
-## Usage
+The executable will be available as:
 
 ```bash
-./interpreter <script-file> [--verbose] [--compile] [--run] [--disassemble]
+./lumen
 ```
 
-Examples:
+## Your First Lumen Program
 
-- Compile and run a script:
+Generate a starter program:
 
 ```bash
-./interpreter examples/fizzbuzz.script
+lumen --introduction
 ```
 
-- Compile only:
+Run it:
 
 ```bash
-./interpreter examples/fizzbuzz.script --compile
+lumen helloworld.lmn
 ```
 
-- Run compiled bytecode only:
+You can also explore built-in examples:
 
 ```bash
-./interpreter examples/fizzbuzz.script.bin --run
+lumen --examples
 ```
 
-- Disassemble a compiled binary:
+Generate an example:
 
 ```bash
-./interpreter examples/fizzbuzz.script.bin --disassemble
+lumen --examples fizzbuzz
 ```
 
-- Run script with debugger
+Run it:
 
 ```bash
-./interpreter examples/fizzbuzz.script --debugger
+lumen fizzbuzz.lmn
 ```
 
-- Run precompiled binary with debugger
+## CLI Usage
 
-```bash
-./interpreter examples/fizzbuzz.script.bin --run --debugger
+```text
+lumen <file> [options]
 ```
 
-- Enable verbose mode:
+Options:
 
-```bash
-./interpreter examples/fizzbuzz.script --verbose
-```
+| Option | Description |
+|--------|-------------|
+| `--verbose` | Enable verbose compiler output |
+| `--compile` | Compile source file |
+| `--run` | Execute compiled bytecode |
+| `--disassemble` | Show bytecode instructions |
+| `--dbgsym` | Generate debug symbols |
+| `--debugger` | Run with debugger |
+| `--introduction` | Create a starter project |
+| `--examples` | List or generate examples |
 
-- Run in Raspberry Pi Pico mode and prepare binary:
+If no option is provided, Lumen compiles and runs the source file automatically.
 
-```bash
-./interpreter examples/pico/blinky.script --pico
-./bin2h examples/pico/blinky.script.bin program.h
-```
-
-## Language syntax
+## Language Syntax
 
 ### Comments
 
-Only one-line comments are available for now.
+```lumen
+# This is a comment
 
-```
-# One-line comment
-println 'Hello, world!' # This is a comment
+println 'Hello!' # Inline comments work too
 ```
 
 ### Variables
 
-Assign values to variables with `=`:
+```lumen
+number = 42
+result = number + 10
 
-```text
-a = 10
-b = a + 2
+println result
 ```
 
 ### Strings
 
-String literals use single quotes:
+Strings use single quotes:
 
-```text
-print 'Hello, world'
-println 'done'
+```lumen
+message = 'Hello, Lumen!'
+println message
 ```
 
-Concatenate stings:
+Concatenation:
 
-```text
-mystr = 'He' .. 'llo'
-result = mystr .. ' world'
-println result
-```
+```lumen
+name = 'Ryan'
+text = 'Hello, ' .. name
 
-### Raspberry Pi Pico
-
-#### GPIO Manipulation
-```text
-gpioInit 25 # Init built-in LED
-gpioInit 2 # Init GPIO 2 (for example, button)
-
-gpioSetDir 25 1 # Set GPIO 25 direction output
-gpioSetDir 2 0 # Set GPIO 2 direction input
-
-gpioPut 25 1 # Digital write 1 to GPIO 25
-
-value = 0
-gpioGet 2 &value # Digital read from GPIO 2
+println text
 ```
 
 ### Input
 
-Read an integer from stdin into a variable:
+Read a string:
 
-```text
-inputInt &N
+```lumen
+name = ''
+
+inputStr &name
+
+println name
 ```
 
-### Conditionals
+Read an integer:
 
-```text
-if a == b
-    println 'equal'
+```lumen
+inputInt &age
+```
+
+### Conditions
+
+```lumen
+if age >= 18
+    println 'Adult'
 else
-    println 'not equal'
+    println 'Minor'
 endif
 ```
 
-### Labels and jumps
+### Loops with Labels
 
-```text
-label start
-    i = i + 1
-    if i <= 10
-        jump start
-    endif
+```lumen
+i = 0
+
+label loop
+
+println i
+
+i = i + 1
+
+if i < 10
+    jump loop
+endif
 ```
 
-### Subroutines
+### Routines
 
-```text
-routines sayhello
-println 'Hello, world!'
+```lumen
+routine hello
+
+println 'Hello from a routine!'
+
 endroutine
 
-println 'My routine'
-call sayhello
+call hello
 ```
 
-### Operators
+## Built-in Functions
 
-- Arithmetic: `+`, `-`, `*`, `/`, `%`, `^`
-- Comparison: `==`, `!=`, `>`, `<`, `>=`, `<=`
+| Function | Description |
+|----------|-------------|
+| `print` | Print without newline |
+| `println` | Print with newline |
+| `inputInt &variable` | Read integer input |
+| `inputStr &variable` | Read string input |
 
-## Built-in functions
+## Operators
 
-- `println <value>` — print a value and newline
-- `print <value>` — print a value without newline
-- `inputInt &<variable>` — read an integer into a variable
+### Arithmetic
 
-### Raspberry Pi Pico specific functions
-- `gpioInit <pin>` — initialize a GPIO pin
-- `gpioSetDir <pin> <direction>` — set GPIO direction (`1` for output, `0` for input)
-- `gpioPut <pin> <value>` — write a digital value to a pin
-- `gpioGet <pin> &<variable>` — read a digital pin into a variable
-- `sleepMs <ms>` — pause execution for the given milliseconds
-- `gpioPullUp <pin>` — enable pull-up resistor on a pin
-- `gpioPullDown <pin>` — enable pull-down resistor on a pin
+```
++
+-
+*
+/
+%
+^
+```
 
+### Comparison
+
+```
+==
+!=
+>
+<
+>=
+<=
+```
+
+## Architecture
+
+Lumen uses a classic compiler pipeline:
+
+```
+Source Code (.lmn)
+        |
+        v
+   Lumen Compiler
+        |
+        v
+ Bytecode (.bin)
+        |
+        v
+ Virtual Machine
+        |
+        v
+     Output
+```
+
+The VM is stack-based and executes custom bytecode instructions.
+
+## Debugging
+
+Compile with debug symbols:
+
+```bash
+lumen program.lmn --dbgsym
+```
+
+Run in debugger mode:
+
+```bash
+lumen program.lmn --debugger
+```
+
+Inspect bytecode:
+
+```bash
+lumen program.lmn --disassemble
+```
+
+## Examples
+
+Included examples:
+
+| Example | Description |
+|---------|-------------|
+| `age` | Age calculator |
+| `temperature` | Temperature converter |
+| `fizzbuzz` | Classic FizzBuzz |
+| `infinite-loop` | Labels and jumps demonstration |
+
+Generate:
+
+```bash
+lumen --examples fizzbuzz
+```
 
 ## Testing
 
-A basic test script is available at `test.sh`.
+Run the test suite:
 
 ```bash
 ./test.sh
 ```
 
-## Bytecode instruction set
+## Project Goals
 
-| Opcode | Instruction | Description |
-|-------:|-------------|-------------|
-| `0x01` | `CALL` | Call user-defined subroutine |
-| `0x02` | `POP` | Pop top of stack into variable |
-| `0x03` | `PUSH` | Push literal, variable or string to stack |
-| `0x04` | `EXEC` | Call built-in function |
-| `0x05` | `JUMP` | Jump to bytecode address |
-| `0xA0` | `ADD` | Add two integers |
-| `0xA1` | `SUB` | Subtract two integers from stack|
-| `0xA2` | `MUL` | Multiply two integers from stack|
-| `0xA3` | `DIV` | Divide two integers from stack|
-| `0xA4` | `POW` | Power operator from stack|
-| `0xA5` | `MOD` | Modulo operator from stack|
-| `0xB0` | `JEQ` | Jump if equal |
-| `0xB1` | `JGR` | Jump if greater |
-| `0xB2` | `JLS` | Jump if less |
-| `0xB3` | `JGE` | Jump if greater or equal |
-| `0xB4` | `JLE` | Jump if less or equal |
-| `0xB5` | `JNE` | Jump if not equal |
-| `0xAA` | `JOIN` | Concatenate strings from stack |
-| `0xFF` | `HLT` | Halt execution |
+Lumen is built to explore:
+
+- How programming languages work
+- Compiler design
+- Bytecode formats
+- Virtual machines
+- Debugging systems
+- Language tooling
+
+The goal is to keep the language approachable while implementing the same fundamental ideas used by larger language runtimes.
+
+## License
+
+See `LICENSE` for details.

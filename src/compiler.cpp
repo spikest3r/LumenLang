@@ -27,7 +27,8 @@ static const std::unordered_map<ConditionOp, int> condOpcodeMap = {
 std::unordered_map<std::string, int> funcList = {
     {"println", 0x01},
     {"print", 0x02},
-    {"inputInt", 0x03}
+    {"inputInt", 0x03},
+    {"inputStr", 0x04}
 };
 
 std::map<std::string, int> picoFuncList = {

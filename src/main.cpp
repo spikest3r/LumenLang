@@ -2,26 +2,87 @@
 #include "vm.h"
 #include "disassembler.h"
 #include "programfile.h"
+#include "examples.h"
 
 int stringIndex = 0;
 int variableIndex = 0;
 
 int main(int argc, char** argv) {
     if(argc < 2) {
-        std::cout << "Usage: interpreter (file) [options]" << std::endl;
-        std::cout << "Options:" << std::endl;
-        std::cout << "  --verbose      Enable verbose output" << std::endl;
-        std::cout << "  --compile      Compile the source file (default)" << std::endl;
-        std::cout << "  --run          Run the compiled bytecode (default)" << std::endl;
-        std::cout << "  --disassemble  Disassemble the compiled bytecode" << std::endl;
-        std::cout << "  --dbgsym       Generate debug symbols information file" << std::endl;
-        std::cout << "  --debugger     Run file in debugger mode" << std::endl;
-        std::cout << "  --pico         Compile with Rapsberry Pi Pico functions" << std::endl;
-        std::cout << "If no options are provided, the program will compile and run the source file." << std::endl;
+        std::cout << "No input file provided.\n";
+        std::cout << "Not sure where to start? Try 'lumen --introduction'!" << std::endl;
         return -1;
     }
 
     std::string file_name = argv[1];
+
+    if(file_name == "--introduction") {
+        std::ofstream file("helloworld.lmn");
+        file << "println 'Hello, world!'\n";
+        file << "name = ''\n";
+        file << "print 'What`s your name? '\n";
+        file << "inputStr &name\n";
+        file << "greeting = 'Hello, ' .. name .. '!'\n";
+        file << "println greeting\n";
+        file.close();
+
+        std::cout << "\n👋 Welcome to LumenLang!\n";
+        std::cout << "--------------------------------------------------\n";
+        std::cout << "✨ A starter script 'helloworld.lmn' was created for you.\n";
+        std::cout << "   This script will say hello and ask for your name.\n\n";
+        std::cout << "Ready to try it out? Run this command:\n";
+        std::cout << "👉  lumen helloworld.lmn\n\n";
+        std::cout << "Want more examples? Try running 'lumen --examples'.\n";
+        std::cout << "For docs, visit: https://lumen.olehsheremeta.com/\n";
+        return 0;
+    } else if(file_name == "--examples") {
+        if(argc == 2) {
+            std::cout << "Available examples: \n";
+            std::cout << "  age               Age calculator\n";
+            std::cout << "  infinite-loop     Infinite loop demonstrating labels and jumps\n";
+            std::cout << "  temperature       Temperature converter\n";
+            std::cout << "  fizzbuzz          Classical FizzBuzz algorithm\n\n";
+            std::cout << "Generate an example:\n";
+            std::cout << "  lumen --examples <name>\n\n";
+            std::cout << "Example:\n";
+            std::cout << "  lumen --exampless fizzbuzz\n";
+            std::cout << std::endl;
+            return 0;
+        } else if(argc == 3) {
+            auto exampleToLoad = argv[2];
+            auto it = exampleMap.find(exampleToLoad);
+            if(it != exampleMap.end()) {
+                // write file
+                auto name = it->second.fileName;
+                auto code = *(it->second.codePtr);
+                std::ofstream file(name);
+                file << code.c_str();
+                file.close();
+                std::cout << "✨ Created '" << name << "'!\n";
+                std::cout << "👉 Run it with: lumen " << name << "\n";
+                return 0;
+            } else {
+                std::cerr << "Unknown example" << std::endl;
+                return -1;
+            }
+        } else {
+            std::cerr << "Invalid arguments" << std::endl;
+            return -1;
+        }
+    } else if(file_name == "--help") {
+        std::cout << "Usage: lumen (file) [options]" << std::endl;
+        std::cout << "Options:" << std::endl;
+        std::cout << "  --verbose                Enable verbose output" << std::endl;
+        std::cout << "  --compile                Compile the source file (default)" << std::endl;
+        std::cout << "  --run                    Run the compiled bytecode (default)" << std::endl;
+        std::cout << "  --disassemble            Disassemble the compiled bytecode" << std::endl;
+        std::cout << "  --dbgsym                 Generate debug symbols information file" << std::endl;
+        std::cout << "  --debugger               Run file in debugger mode" << std::endl;
+        std::cout << "  --pico         Compile with Rapsberry Pi Pico functions" << std::endl;
+        std::cout << "If no options are provided, the program will compile and run the source file." << std::endl;
+        return 0;
+    }
+    
     bool verboseFlag = false;
     bool compileFlag = false;
     bool runFlag = false;

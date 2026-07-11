@@ -7,3 +7,4 @@ examples/*.bin
 *.dbg
 examples/*.dbg
 build
+test
