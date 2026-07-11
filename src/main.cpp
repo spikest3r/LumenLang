@@ -85,6 +85,17 @@ int main(int argc, char** argv) {
         std::cout << "  --pico                   Compile with Rapsberry Pi Pico functions" << std::endl;
         std::cout << "If no options are provided, the program will compile and run the source file." << std::endl;
         return 0;
+    } else if(file_name == "--version") {
+        if(argc != 2) {
+            std::cerr << "Invalid arguments" << std::endl;
+            return -1;
+        }
+        std::cout
+            << "LumenLang v" << LUMEN_VERSION << "\n"
+            << "Branch: " << GIT_BRANCH << "\n"
+            << "Commit: " << GIT_COMMIT << "\n"
+            << "Build: " << BUILD_DATE << "\n";
+        return 0;
     }
     
     bool verboseFlag = false;
