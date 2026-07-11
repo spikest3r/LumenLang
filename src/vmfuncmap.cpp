@@ -22,5 +22,12 @@ std::unordered_map<int, NativeFn> funcMap = {
         }
         variables[varIndex].type = TAG_INT;
         variables[varIndex].data = result;
+    }},
+    {0x04, [](std::vector<Variant>& stack, std::vector<Variant>& variables) {
+        auto varIndex = getInt(stack.back()); stack.pop_back();
+        std::string input;
+        std::cin >> input;
+        variables[varIndex].type = TAG_STRING;
+        variables[varIndex].data = input;
     }}
 };
