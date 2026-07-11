@@ -148,6 +148,9 @@ void fn_print(Variant stack[16], Variant variables[16], int* sp) {
 void fn_inputInt(Variant stack[16], Variant variables[16], int* sp) {
 }
 
+void fn_inputStr(Variant stack[16], Variant variables[16], int* sp) {
+}
+
 void fn_gpioInit(Variant stack[16], Variant variables[16], int* sp) {
     Variant* arg = &stack[*sp];
     (*sp)--;
@@ -291,9 +294,24 @@ int execute(
                 break;
             }
             case 0x04: {
-                int functionIndex = bytecode[PC + 1];
-                if(funcTable[functionIndex])
-                    funcTable[functionIndex](stack, variables, &stackPointer);
+                int addr = bytecode[PC + 1];
+                int index;
+
+                if(addr >= 0xAA00 && addr <= 0xAABF) {
+                    index = (addr - 0xAA00) + 4;
+                }
+                else {
+                    index = addr;
+                }
+
+                if(index < 0 || index >= sizeof(funcTable)/sizeof(funcTable[0])) {
+                    send_uart("Invalid native call\n");
+                    return -1;
+                }
+
+                if(funcTable[index])
+                    funcTable[index](stack, variables, &stackPointer);
+
                 break;
             }
             case 0x05: {

@@ -31,14 +31,15 @@ std::unordered_map<std::string, int> funcList = {
     {"inputStr", 0x04}
 };
 
+// 0xAA00 - 0xABFF is reserved for embedded functions
 std::map<std::string, int> picoFuncList = {
-    {"gpioInit", 0x04},
-    {"gpioSetDir", 0x05},
-    {"gpioPut", 0x06},
-    {"sleepMs", 0x07},
-    {"gpioGet", 0x08},
-    {"gpioPullUp", 0x09},
-    {"gpioPullDown", 0x0A}
+    {"gpioInit", 0xAA00},
+    {"gpioSetDir", 0xAA01},
+    {"gpioPut", 0xAA02},
+    {"sleepMs", 0xAA03},
+    {"gpioGet", 0xAA04},
+    {"gpioPullUp", 0xAA05},
+    {"gpioPullDown", 0xAA06}
 };
 
 void printError(std::string error, int line) {

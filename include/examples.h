@@ -101,9 +101,83 @@ println 'Hello, world!'
 jump repeat
 )";
 
+std::string blinky = R"(gpioInit 25
+gpioSetDir 25 1
+
+wait = 500
+
+direction = 1
+increment = 100
+
+label loop
+
+gpioPut 25 1
+sleepMs wait
+gpioPut 25 0
+sleepMs wait
+
+wait = wait + increment * direction
+if wait >= 1000
+direction = -1
+endif
+if wait <= 100
+direction = 1
+endif
+
+println wait
+
+jump loop
+)";
+
+std::string buttons = R"(gpioInit 25
+gpioSetDir 25 1
+
+gpioInit 2
+gpioSetDir 2 0
+gpioPullUp 2
+
+println 'GPIO Init'
+
+btnVal = 0
+
+led = 0
+
+label loop
+
+gpioGet 2 &btnVal
+btnVal = 1 - btnVal
+
+if btnVal == 1
+
+println 'Pressed'
+
+led = 1 - led
+gpioPut 25 led
+println led
+
+label await
+
+gpioGet 2 &btnVal
+btnVal = 1 - btnVal
+
+if btnVal == 1
+jump await
+endif
+
+println 'Released'
+
+endif
+
+sleepMs 50
+
+jump loop
+)";
+
 std::unordered_map<std::string, Example> exampleMap = {
     {"age", {&age, "age.lmn"}},
     {"infinite-loop", {&infinite_loop, "infinite.lmn"}},
     {"temperature", {&temperature, "temperature.lmn"}},
-    {"fizzbuzz", {&fizzbuzz, "fizzbuzz.lmn"}}
+    {"fizzbuzz", {&fizzbuzz, "fizzbuzz.lmn"}},
+    {"blinky", {&blinky, "blinky.lmn"}},
+    {"buttons", {&buttons, "buttons.lmn"}}
 };

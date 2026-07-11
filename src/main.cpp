@@ -42,6 +42,10 @@ int main(int argc, char** argv) {
             std::cout << "  infinite-loop     Infinite loop demonstrating labels and jumps\n";
             std::cout << "  temperature       Temperature converter\n";
             std::cout << "  fizzbuzz          Classical FizzBuzz algorithm\n\n";
+            std::cout << "Pico examples: \n";
+            std::cout << "  blinky            Blink on-board LED in oscillating pattern\n";
+            std::cout << "  buttons           Toggle on-board LED by pressing button (GPIO 2)\n";
+            std::cout << "Desktop examples work on Raspberry Pi Pico as well!\n\n";
             std::cout << "Generate an example:\n";
             std::cout << "  lumen --examples <name>\n\n";
             std::cout << "Example:\n";
@@ -78,7 +82,7 @@ int main(int argc, char** argv) {
         std::cout << "  --disassemble            Disassemble the compiled bytecode" << std::endl;
         std::cout << "  --dbgsym                 Generate debug symbols information file" << std::endl;
         std::cout << "  --debugger               Run file in debugger mode" << std::endl;
-        std::cout << "  --pico         Compile with Rapsberry Pi Pico functions" << std::endl;
+        std::cout << "  --pico                   Compile with Rapsberry Pi Pico functions" << std::endl;
         std::cout << "If no options are provided, the program will compile and run the source file." << std::endl;
         return 0;
     }
