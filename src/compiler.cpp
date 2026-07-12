@@ -59,14 +59,17 @@ void pushToStack(std::string token, std::vector<int>& bytecode,
     }
 }
 
-int compile(std::string fileName, 
+int compile(const std::string& script, 
     std::vector<int>& g_bytecode,
-    std::unordered_map<std::string, int>& variableMap,
-    std::vector<std::string>& stringPool, std::unordered_map<std::string, int>& stringPoolMap,
-    int& variableIndex, int& stringIndex, bool verbose, bool debugInfo
+    std::vector<std::string>& stringPool,
+    int& variableIndex, bool verbose, bool debugInfo
 ) {
-    std::ifstream file(fileName);
+    std::istringstream stream(script);
     std::string line;
+
+    int stringIndex = 0;
+    std::unordered_map<std::string, int> variableMap;
+    std::unordered_map<std::string, int> stringPoolMap;
 
     std::unordered_map<std::string, int> jumpTable;
     std::unordered_map<int, std::vector<int>> subroutineBytecode;
@@ -83,7 +86,7 @@ int compile(std::string fileName,
     int routineIndex = -1;
     int routineCount = 0;
 
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
         if(verbose) std::cout << line << std::endl;
         auto tokens = tokenizeFormula(line);
         if(verbose) {
@@ -455,28 +458,28 @@ int compile(std::string fileName,
         }
     }
 
-    if(debugInfo) {
-        std::ofstream debugFile(fileName + ".bin.dbg");
-        // write variable names and their indices
-        debugFile << "variables" << std::endl;
-        for(const auto& var : variableMap) {
-            debugFile << var.first << " " << var.second << std::endl;
-        }
-        // write subroutine names, their bytecode offsets and bytecode length
-        debugFile << "routines" << std::endl;
-        for(const auto& sub : subroutineIndexMap) {
-            debugFile << sub.first << std::endl;
-            debugFile << routineOffsets[sub.second] - 1 << std::endl;
-            debugFile << subroutineBytecode[sub.second].size() << std::endl;
-        }
-        // write exec functions
-        debugFile << "exec" << std::endl;
-        for(const auto& func: funcList) {
-            debugFile << func.first << " " << func.second << std::endl;
-        }
-    }
+    // TODO: Debug info
 
-    file.close();
+    // if(debugInfo) {
+    //     std::ofstream debugFile(fileName + ".bin.dbg");
+    //     // write variable names and their indices
+    //     debugFile << "variables" << std::endl;
+    //     for(const auto& var : variableMap) {
+    //         debugFile << var.first << " " << var.second << std::endl;
+    //     }
+    //     // write subroutine names, their bytecode offsets and bytecode length
+    //     debugFile << "routines" << std::endl;
+    //     for(const auto& sub : subroutineIndexMap) {
+    //         debugFile << sub.first << std::endl;
+    //         debugFile << routineOffsets[sub.second] - 1 << std::endl;
+    //         debugFile << subroutineBytecode[sub.second].size() << std::endl;
+    //     }
+    //     // write exec functions
+    //     debugFile << "exec" << std::endl;
+    //     for(const auto& func: funcList) {
+    //         debugFile << func.first << " " << func.second << std::endl;
+    //     }
+    // }
 
     return 0;
 }

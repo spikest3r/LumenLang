@@ -111,11 +111,13 @@ std::unordered_map<uint32_t, std::string> buildRoutineStarts(
     return routineStarts;
 }
 
-void disassemble(std::vector<int> bytecode, std::vector<std::string> stringPool, 
+std::string disassemble(std::vector<int> bytecode, std::vector<std::string> stringPool, 
     std::string debugFile, bool* debugSymbolsLoaded, int vmPC
 ) {
     int PC = 0;
     int size = bytecode.size();
+
+    std::stringstream ss;
 
     std::unordered_map<int, std::string> variables_debug;
     std::unordered_map<std::string, RoutineInfo> routines_debug;
@@ -137,20 +139,20 @@ void disassemble(std::vector<int> bytecode, std::vector<std::string> stringPool,
 
     bool pointMode = vmPC != -1;
 
-    std::cout << "===== Main =====" << std::endl;
+    ss << "===== Main =====" << std::endl;
     
     while(PC < size) {
         auto offset = getOpCodeOffset(bytecode[PC]);
 
         if(pointMode) {
             if (vmPC == PC) {
-                std::cout << "PC -> ";
+                ss << "PC -> ";
             } else {
-                std::cout << "      ";
+                ss << "      ";
             }
         }
 
-        std::cout << "0x" << std::hex << std::right << std::setw(8) << std::setfill('0') << PC << ": ";
+        ss << "0x" << std::hex << std::right << std::setw(8) << std::setfill('0') << PC << ": ";
 
         std::stringstream hex_stream;
         for(int i = PC; i < PC + offset; i++) {
@@ -158,81 +160,83 @@ void disassemble(std::vector<int> bytecode, std::vector<std::string> stringPool,
                     << static_cast<int>(bytecode[i]) << " ";
         }
 
-        std::cout << std::setfill(' ') << std::left << std::setw(15) << hex_stream.str() << " | ";
+        ss << std::setfill(' ') << std::left << std::setw(15) << hex_stream.str() << " | ";
 
-        std::cout << std::dec;
+        ss << std::dec;
 
         auto byte = bytecode[PC];
         auto op = disassemblyMap[byte];
-        std::cout << op;
+        ss << op;
 
         int j = 0;
         for(int i = PC + 1; i < PC + offset; i++) {
             if(!op.empty() && op[0] == 'J') {
-                std::cout << " 0x" 
+                ss << " 0x" 
                         << std::hex << std::right << std::setw(8) << std::setfill('0')
                         << static_cast<int>(bytecode[i]);
                 
-                std::cout << std::dec << std::setfill(' ') << std::left; 
+                ss << std::dec << std::setfill(' ') << std::left; 
             } else {
                 switch(byte) {
                     case 0x01: // CALL
                         {
                             if(hasDebugData) {
                                 auto rt = routineStarts[bytecode[PC + 1] - 1];
-                                std::cout << " " << rt << " (0x" 
+                                ss << " " << rt << " (0x" 
                                         << std::hex << std::right << std::setw(8) << std::setfill('0')
                                         << static_cast<int>(bytecode[i]) << ")";
                             } else {
-                                std::cout << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
+                                ss << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
                             }
                         }
                         break;
                     case 0x02: // POP
-                        if(hasDebugData) std::cout << " " << variables_debug[bytecode[PC + 1]];
-                        else std::cout << " " << std::dec << static_cast<int>(bytecode[PC + 1]);
+                        if(hasDebugData) ss << " " << variables_debug[bytecode[PC + 1]];
+                        else ss << " " << std::dec << static_cast<int>(bytecode[PC + 1]);
                         break;
                     case 0x03: // PUSH
                         if(j < 1) {
                             if(bytecode[PC + 1] == 0x01) {
-                                std::cout << " '" << stringPool[bytecode[PC + 2]] << "'";
+                                ss << " '" << stringPool[bytecode[PC + 2]] << "'";
                             } else if(hasDebugData) { 
                                 if(bytecode[PC + 1] == 0x02) {
-                                    std::cout << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
+                                    ss << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
                                 } else if(bytecode[PC + 1] == 0x03) {
-                                    std::cout << " " << variables_debug[bytecode[PC + 2]];
+                                    ss << " " << variables_debug[bytecode[PC + 2]];
                                 }
                             } else {
-                                std::cout << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
+                                ss << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
                             }
                         }
                         break;
                     case 0x04: // EXEC
                         {
-                            if(hasDebugData) std::cout << " " << funcList_debug[bytecode[PC + 1]];
-                            else std::cout << " " << std::dec << static_cast<int>(bytecode[PC + 1]);
+                            if(hasDebugData) ss << " " << funcList_debug[bytecode[PC + 1]];
+                            else ss << " " << std::dec << static_cast<int>(bytecode[PC + 1]);
                         }
                         break;
                     default:
-                        std::cout << " " << std::dec << static_cast<int>(bytecode[i]);
+                        ss << " " << std::dec << static_cast<int>(bytecode[i]);
                         break;
                 }
             }
             j++;
         }
 
-        std::cout << std::endl;
+        ss << std::endl;
 
         if(hasDebugData) {
             auto it = routineStarts.find(PC);
             if (it != routineStarts.end())
             {
-                std::cout << "\n===== Routine " << it->second << " =====\n";
+                ss << "\n===== Routine " << it->second << " =====\n";
             }
         }
         
         PC += offset;
     }
 
-    std::cout << std::dec << std::endl;
+    ss << std::dec << std::endl;
+
+    return ss.str();
 }

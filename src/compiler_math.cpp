@@ -1,13 +1,11 @@
 #include "compiler.h"
+#include <charconv>
 
 static bool isNum(const std::string &s) {
     if (s.empty()) return false;
-    try {
-        std::stof(s);
-        return true;
-    } catch (...) {
-        return false;
-    }
+    float val;
+    auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), val);
+    return ec == std::errc() && ptr == s.data() + s.size();
 }
 
 static bool isOp(char c) {

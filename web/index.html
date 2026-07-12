@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lumen Playground</title>
+<style>
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #0d0f12;
+    color: #d8dee4;
+    font-family: monospace;
+    font-size: 13px;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---- menu bar ---- */
+
+  .menubar {
+    display: flex;
+    align-items: center;
+    background: #14171b;
+    border-bottom: 1px solid #262b32;
+    padding: 0 4px;
+    position: relative;
+    user-select: none;
+    flex-shrink: 0;
+  }
+
+  .menu {
+    position: relative;
+  }
+
+  .menu-label {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #d8dee4;
+  }
+
+  .menu-label:hover, .menu.open .menu-label {
+    background: #1d2127;
+    color: #5fb3a3;
+  }
+
+  .menu-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 170px;
+    background: #14171b;
+    border: 1px solid #262b32;
+    border-radius: 3px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+    z-index: 10;
+    padding: 4px 0;
+  }
+
+  .menu.open .menu-dropdown {
+    display: block;
+  }
+
+  .menu-item {
+    padding: 6px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .menu-item:hover {
+    background: #1d2127;
+    color: #5fb3a3;
+  }
+
+  .menu-item.disabled {
+    color: #444a52;
+    cursor: not-allowed;
+  }
+
+  .menu-item.disabled:hover {
+    background: none;
+    color: #444a52;
+  }
+
+  .menu-sep {
+    height: 1px;
+    background: #262b32;
+    margin: 4px 0;
+  }
+
+  input[type=file] { display: none; }
+
+  /* ---- action row ---- */
+
+  .actionbar {
+    display: flex;
+    gap: 6px;
+    padding: 6px 10px;
+    background: #101317;
+    border-bottom: 1px solid #262b32;
+    flex-shrink: 0;
+  }
+
+  .actionbar button {
+    background: transparent;
+    border: 1px solid #262b32;
+    color: #d8dee4;
+    font-family: monospace;
+    font-size: 12px;
+    padding: 5px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  .actionbar button:hover:not(:disabled) {
+    border-color: #5fb3a3;
+    color: #5fb3a3;
+  }
+
+  .actionbar button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .filename {
+    margin-left: auto;
+    align-self: center;
+    font-size: 11px;
+    color: #6b7480;
+  }
+
+  /* ---- panes ---- */
+
+  main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+
+  .pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  #editor {
+    flex: 1;
+    background: #0d0f12;
+    color: #d8dee4;
+    border: none;
+    outline: none;
+    resize: none;
+    padding: 14px;
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  #editor[readonly] {
+    color: #6b7480;
+    background: #101317;
+  }
+
+  .split {
+    width: 1px;
+    background: #262b32;
+  }
+
+  #console {
+    flex: 1;
+    padding: 14px;
+    color: #6b7480;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+</style>
+</head>
+<body>
+
+<div class="menubar">
+  <div class="menu" id="fileMenu">
+    <div class="menu-label">File</div>
+    <div class="menu-dropdown">
+      <div class="menu-item" id="m-new">New</div>
+      <div class="menu-sep"></div>
+      <div class="menu-item" id="m-openLmn">Open LMN</div>
+      <div class="menu-item" id="m-openBin">Open BIN</div>
+      <div class="menu-sep"></div>
+      <div class="menu-item" id="m-saveLmn">Save LMN</div>
+      <div class="menu-item" id="m-saveBin">Save BIN</div>
+    </div>
+  </div>
+  <a class="menu-label" id="docsLink" href="#" target="_blank" style="text-decoration:none;">Docs</a>
+</div>
+
+<input type="file" id="loadLmnInput" accept=".lmn,.lumen,.txt">
+<input type="file" id="loadBinInput" accept=".bin">
+
+<div class="actionbar">
+  <button id="compileBtn">Compile</button>
+  <button id="runBtn">Run</button>
+  <button id="disasmBtn">Disassemble</button>
+  <button id="clearBtn">Clear Console</button>
+  <span class="filename" id="filenameLabel">untitled.lmn</span>
+</div>
+
+<main>
+  <div class="pane">
+    <textarea id="editor" spellcheck="false" placeholder="# write lumen here"></textarea>
+  </div>
+  <div class="split"></div>
+  <div class="pane">
+    <div id="console"></div>
+  </div>
+</main>
+
+<script type="module">
+  import createModule from './lumen.js';
+
+  // ---- element refs ----
+  const editor         = document.getElementById('editor');
+  const consoleEl       = document.getElementById('console');
+  const filenameLabel   = document.getElementById('filenameLabel');
+
+  const compileBtn      = document.getElementById('compileBtn');
+  const runBtn           = document.getElementById('runBtn');
+  const disasmBtn        = document.getElementById('disasmBtn');
+  const clearBtn         = document.getElementById('clearBtn');
+  const docsLink         = document.getElementById('docsLink');
+
+  const loadLmnInput    = document.getElementById('loadLmnInput');
+  const loadBinInput    = document.getElementById('loadBinInput');
+
+  const mNew            = document.getElementById('m-new');
+  const mOpenLmn        = document.getElementById('m-openLmn');
+  const mOpenBin        = document.getElementById('m-openBin');
+  const mSaveLmn        = document.getElementById('m-saveLmn');
+  const mSaveBin        = document.getElementById('m-saveBin');
+
+  const fileMenu        = document.getElementById('fileMenu');
+
+  // ---- state ----
+  let currentFilename = 'untitled.lmn';
+  // 'source'   -> editor holds editable .lmn source, nothing compiled yet or stale
+  // 'compiled' -> editor holds source that was just compiled successfully (disassemble works)
+  // 'bin'      -> editor holds a loaded .bin's disassembly (readonly, no source)
+  let mode = 'source';
+
+  function setFilename(name) {
+    currentFilename = name;
+    filenameLabel.textContent = name;
+  }
+
+  function setMode(newMode) {
+    mode = newMode;
+    editor.readOnly = (mode === 'bin');
+    disasmBtn.disabled = (mode !== 'compiled');
+    runBtn.disabled = (mode === 'source');
+  }
+
+  setMode('source');
+
+  // TODO: set real docs URL
+  docsLink.href = 'https://lumen.olehsheremeta.com/';
+
+  // ---- console ----
+  function writeLine(text, color) {
+    const div = document.createElement('div');
+    if (color) div.style.color = color;
+    div.textContent = text;
+    consoleEl.appendChild(div);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
+  function clearConsole() {
+    consoleEl.textContent = '';
+  }
+
+  clearBtn.addEventListener('click', clearConsole);
+
+  const Module = await createModule({
+    print: (text) => writeLine(text),
+    printErr: (text) => writeLine(text, '#d97757'),
+  });
+
+  // fallback in case this build writes straight to console instead
+  // of honoring print/printErr config
+  const origLog = console.log.bind(console);
+  const origErr = console.error.bind(console);
+  console.log = (...args) => {
+    origLog(...args);
+    const text = args.join(' ');
+    if (text) writeLine(text);
+  };
+  console.error = (...args) => {
+    origErr(...args);
+    const text = args.join(' ');
+    if (text) writeLine(text, '#d97757');
+  };
+
+  // ---- menu open/close ----
+  document.querySelector('#fileMenu .menu-label').addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileMenu.classList.toggle('open');
+  });
+  document.addEventListener('click', () => fileMenu.classList.remove('open'));
+
+  function closeMenu() { fileMenu.classList.remove('open'); }
+
+  // ---- actions ----
+
+  compileBtn.addEventListener('click', () => {
+    clearConsole();
+    const rc = Module.compileScript(editor.value);
+    if (rc === 0) {
+      writeLine('compiled ok', '#5fb3a3');
+      setMode('compiled');
+    } else {
+      writeLine('compile failed (code ' + rc + ')', '#d97757');
+      setMode('source');
+    }
+  });
+
+  runBtn.addEventListener('click', () => {
+    clearConsole();
+    const rc = Module.runVM();
+    if (rc !== 0) {
+      writeLine('run failed (code ' + rc + ')', '#d97757');
+    }
+  });
+
+  disasmBtn.addEventListener('click', () => {
+    if (mode !== 'compiled') return; // no-op if a bin is loaded or nothing compiled
+    clearConsole();
+    const asm = Module.disassembleBin();
+    writeLine('--- disassembly ---');
+    writeLine(asm);
+  });
+
+  // ---- File menu items ----
+
+  mNew.addEventListener('click', () => {
+    closeMenu();
+    editor.value = '';
+    setFilename('untitled.lmn');
+    setMode('source');
+  });
+
+  mOpenLmn.addEventListener('click', () => {
+    closeMenu();
+    loadLmnInput.click();
+  });
+
+  mOpenBin.addEventListener('click', () => {
+    closeMenu();
+    loadBinInput.click();
+  });
+
+  mSaveLmn.addEventListener('click', () => {
+    closeMenu();
+    downloadBlob(new Blob([editor.value], { type: 'text/plain' }), baseName(currentFilename) + '.lmn');
+  });
+
+  mSaveBin.addEventListener('click', () => {
+    closeMenu();
+    const ok = Module.saveProgram('_export.bin');
+    if (!ok) {
+      writeLine('save failed: nothing compiled/loaded', '#d97757');
+      return;
+    }
+    const bytes = Module.FS.readFile('_export.bin');
+    downloadBlob(new Blob([bytes], { type: 'application/octet-stream' }), baseName(currentFilename) + '.bin');
+  });
+
+  // ---- file inputs ----
+
+  loadLmnInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    editor.value = await file.text();
+    setFilename(file.name);
+    setMode('source');
+    e.target.value = '';
+  });
+
+  loadBinInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const buf = new Uint8Array(await file.arrayBuffer());
+    Module.FS.writeFile(file.name, buf);
+    const ok = Module.loadProgram(file.name);
+    if (ok) {
+      setFilename(file.name);
+      const asm = Module.disassembleBin();
+      editor.value = asm;
+      setMode('bin');
+      writeLine('loaded ' + file.name, '#5fb3a3');
+    } else {
+      writeLine('failed to load ' + file.name, '#d97757');
+    }
+    e.target.value = '';
+  });
+
+  // ---- helpers ----
+
+  function baseName(name) {
+    return name.replace(/\.[^/.]+$/, '');
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+</script>
+
+</body>
+</html>

@@ -1,5 +1,18 @@
 # LumenLang
 
+### WASM Branch
+
+This branch implements LumenLang toolkit for web with WASM and provides assets for [Lumen Playground](https://lumen.olehsheremeta.com/playground).
+
+As of now, not all features are fully implemented.
+
+Currently available features are:
+
+- Compiler
+- VM
+- Disassembler
+
+---
 A lightweight, stack-based scripting language with a custom compiler, bytecode format, and virtual machine written in C++20.
 
 Lumen is designed to be simple to learn while still exposing the concepts behind real programming languages: compilation, bytecode execution, virtual machines, debugging, and optimization.
@@ -64,21 +77,20 @@ Requirements:
 - Linux or Unix-like operating system
 - C++20 compiler
 - CMake
+- **Emscripten SDK (emsdk)**
 
 Build from the repository root:
 
 ```bash
 mkdir build
 cd build
-cmake ..
-make -j$(nproc)
+emcmake cmake ..
+emmake make
 ```
 
-The executable will be available as:
+In build folder you will find `lumen.wasm` and `lumen.js` files.
 
-```bash
-./lumen
-```
+To run Lumen Playground locally, copy `index.html` from `web` folder to `build` and serve with server.
 
 ## Your First Lumen Program
 
