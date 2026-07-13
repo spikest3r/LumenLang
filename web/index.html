@@ -20,8 +20,6 @@
     flex-direction: column;
   }
 
-  /* ---- menu bar ---- */
-
   .menubar {
     display: flex;
     align-items: center;
@@ -79,16 +77,6 @@
     color: #5fb3a3;
   }
 
-  .menu-item.disabled {
-    color: #444a52;
-    cursor: not-allowed;
-  }
-
-  .menu-item.disabled:hover {
-    background: none;
-    color: #444a52;
-  }
-
   .menu-sep {
     height: 1px;
     background: #262b32;
@@ -96,8 +84,6 @@
   }
 
   input[type=file] { display: none; }
-
-  /* ---- action row ---- */
 
   .actionbar {
     display: flex;
@@ -135,8 +121,6 @@
     font-size: 11px;
     color: #6b7480;
   }
-
-  /* ---- panes ---- */
 
   main {
     flex: 1;
@@ -199,6 +183,14 @@
       <div class="menu-item" id="m-saveBin">Save BIN</div>
     </div>
   </div>
+  <div class="menu" id="examplesMenu">
+    <div class="menu-label">Examples</div>
+    <div class="menu-dropdown">
+      <div class="menu-item" data-example="fizzbuzz">FizzBuzz</div>
+      <div class="menu-item" data-example="temperature">Temperature</div>
+      <div class="menu-item" data-example="age">Age</div>
+    </div>
+  </div>
   <a class="menu-label" id="docsLink" href="#" target="_blank" style="text-decoration:none;">Docs</a>
 </div>
 
@@ -226,7 +218,6 @@
 <script type="module">
   import createModule from './lumen.js';
 
-  // ---- element refs ----
   const editor         = document.getElementById('editor');
   const consoleEl       = document.getElementById('console');
   const filenameLabel   = document.getElementById('filenameLabel');
@@ -247,12 +238,9 @@
   const mSaveBin        = document.getElementById('m-saveBin');
 
   const fileMenu        = document.getElementById('fileMenu');
+  const examplesMenu    = document.getElementById('examplesMenu');
 
-  // ---- state ----
   let currentFilename = 'untitled.lmn';
-  // 'source'   -> editor holds editable .lmn source, nothing compiled yet or stale
-  // 'compiled' -> editor holds source that was just compiled successfully (disassemble works)
-  // 'bin'      -> editor holds a loaded .bin's disassembly (readonly, no source)
   let mode = 'source';
 
   function setFilename(name) {
@@ -269,10 +257,8 @@
 
   setMode('source');
 
-  // TODO: set real docs URL
   docsLink.href = 'https://lumen.olehsheremeta.com/';
 
-  // ---- console ----
   function writeLine(text, color) {
     const div = document.createElement('div');
     if (color) div.style.color = color;
@@ -292,8 +278,6 @@
     printErr: (text) => writeLine(text, '#d97757'),
   });
 
-  // fallback in case this build writes straight to console instead
-  // of honoring print/printErr config
   const origLog = console.log.bind(console);
   const origErr = console.error.bind(console);
   console.log = (...args) => {
@@ -307,16 +291,22 @@
     if (text) writeLine(text, '#d97757');
   };
 
-  // ---- menu open/close ----
-  document.querySelector('#fileMenu .menu-label').addEventListener('click', (e) => {
-    e.stopPropagation();
-    fileMenu.classList.toggle('open');
+  document.querySelectorAll('.menu > .menu-label').forEach((label) => {
+    label.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const menu = label.parentElement;
+      const wasOpen = menu.classList.contains('open');
+      document.querySelectorAll('.menu.open').forEach((m) => m.classList.remove('open'));
+      if (!wasOpen) menu.classList.add('open');
+    });
   });
-  document.addEventListener('click', () => fileMenu.classList.remove('open'));
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.menu.open').forEach((m) => m.classList.remove('open'));
+  });
 
-  function closeMenu() { fileMenu.classList.remove('open'); }
-
-  // ---- actions ----
+  function closeMenus() {
+    document.querySelectorAll('.menu.open').forEach((m) => m.classList.remove('open'));
+  }
 
   compileBtn.addEventListener('click', () => {
     clearConsole();
@@ -339,39 +329,37 @@
   });
 
   disasmBtn.addEventListener('click', () => {
-    if (mode !== 'compiled') return; // no-op if a bin is loaded or nothing compiled
+    if (mode !== 'compiled') return;
     clearConsole();
     const asm = Module.disassembleBin();
     writeLine('--- disassembly ---');
     writeLine(asm);
   });
 
-  // ---- File menu items ----
-
   mNew.addEventListener('click', () => {
-    closeMenu();
+    closeMenus();
     editor.value = '';
     setFilename('untitled.lmn');
     setMode('source');
   });
 
   mOpenLmn.addEventListener('click', () => {
-    closeMenu();
+    closeMenus();
     loadLmnInput.click();
   });
 
   mOpenBin.addEventListener('click', () => {
-    closeMenu();
+    closeMenus();
     loadBinInput.click();
   });
 
   mSaveLmn.addEventListener('click', () => {
-    closeMenu();
+    closeMenus();
     downloadBlob(new Blob([editor.value], { type: 'text/plain' }), baseName(currentFilename) + '.lmn');
   });
 
   mSaveBin.addEventListener('click', () => {
-    closeMenu();
+    closeMenus();
     const ok = Module.saveProgram('_export.bin');
     if (!ok) {
       writeLine('save failed: nothing compiled/loaded', '#d97757');
@@ -381,7 +369,17 @@
     downloadBlob(new Blob([bytes], { type: 'application/octet-stream' }), baseName(currentFilename) + '.bin');
   });
 
-  // ---- file inputs ----
+  examplesMenu.querySelectorAll('.menu-item[data-example]').forEach((item) => {
+    item.addEventListener('click', () => {
+      closeMenus();
+      const key = item.getAttribute('data-example');
+      const source = Module.getExample(key);
+      editor.value = source;
+      setFilename(key + '.lmn');
+      setMode('source');
+      writeLine('loaded example: ' + key, '#5fb3a3');
+    });
+  });
 
   loadLmnInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
@@ -409,8 +407,6 @@
     }
     e.target.value = '';
   });
-
-  // ---- helpers ----
 
   function baseName(name) {
     return name.replace(/\.[^/.]+$/, '');

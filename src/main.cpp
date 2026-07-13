@@ -2,6 +2,7 @@
 #include "vm.h"
 #include "compiler.h"
 #include "disassembler.h"
+#include "examples.h"
 #include <emscripten/bind.h>
 
 static BinaryProgram program;
@@ -47,6 +48,17 @@ std::string disassembleBin() {
     );
 }
 
+std::string getExample(const std::string& key) {
+    auto it = exampleMap.find(key);
+    if(it != exampleMap.end()) {
+        return *(it->second.codePtr);
+    } else {
+        // return generic example
+        std::cout << "Failed to load example: " << key << std::endl;
+        return "println 'Hello, world!'";
+    }
+} 
+
 EMSCRIPTEN_BINDINGS(module) {
     emscripten::function("loadProgram", &loadProgram);
     emscripten::function("saveProgram", &saveProgram);
@@ -54,4 +66,5 @@ EMSCRIPTEN_BINDINGS(module) {
     emscripten::function("compileScript", &compileScript);
     emscripten::function("init", &init);
     emscripten::function("disassembleBin", &disassembleBin);
+    emscripten::function("getExample", &getExample);
 }
