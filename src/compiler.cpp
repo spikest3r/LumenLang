@@ -28,7 +28,9 @@ std::unordered_map<std::string, int> funcList = {
     {"println", 0x01},
     {"print", 0x02},
     {"inputInt", 0x03},
-    {"inputStr", 0x04}
+    {"inputStr", 0x04},
+    {"str2int", 0x05},
+    {"int2str", 0x06}
 };
 
 void printError(std::string error, int line) {

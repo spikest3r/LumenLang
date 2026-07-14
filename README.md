@@ -246,6 +246,8 @@ call hello
 | `println` | Print with newline |
 | `inputInt &variable` | Read integer input |
 | `inputStr &variable` | Read string input |
+| `int2str in, &out` | Convert integer to string |
+| `str2int in, &out` | Convert string to integer |
 
 ## Operators
 
