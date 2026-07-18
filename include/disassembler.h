@@ -8,8 +8,9 @@ struct RoutineInfo
     uint32_t length;
 };
 
-void disassemble(std::vector<int> bytecode, 
+void disassemble(std::vector<uint8_t> bytecode, 
     std::vector<std::string> stringPool, 
+    std::vector<int> constPool,
     std::string debugFile = "", 
     bool* debugSymbolsLoaded = nullptr,
     int vmPC = -1

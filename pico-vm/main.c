@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <errno.h>
 
 #define UART_ID uart1
 #define BAUD_RATE 115200
@@ -16,11 +17,18 @@
 #define MAX_STRINGS 16
 #define MAX_STRING_LEN 64
 
-static int* g_bytecode = NULL;
+#define MAX_CONST_POOL 256 // practical uint8_t limit
+
+static uint8_t* g_bytecode = NULL;
 static int g_bytecodeSize = 0;
+
 static char* g_stringPool[MAX_STRINGS];
 static int g_stringPoolSize = 0;
-static int g_variableIndex = 0;
+
+static int g_constPool[MAX_CONST_POOL];
+static int g_constPoolSize = 0;
+
+static int g_variableCount = 0;
 
 typedef enum {
     TAG_INT = 2,
@@ -30,7 +38,7 @@ typedef enum {
 typedef struct {
     TypeTag type;
     union {
-        int64_t i;
+        int32_t i;
         char* str;
     } data;
 } Variant;
@@ -40,36 +48,62 @@ void send_uart(const char* message) {
     printf("%s", message);
 }
 
-static int readInt(const uint32_t* data, int* pos) {
+void uart_readline(char* buffer, int maxLen) {
+    int i = 0;
+
+    while(i < maxLen - 1) {
+        int c = getchar();
+
+        if(c == '\r' || c == '\n')
+            break;
+
+        buffer[i++] = c;
+        putchar(c);
+    }
+
+    buffer[i] = '\0';
+    printf("\n");
+}
+
+static int readInt(const uint8_t* data, int* pos) {
     int val = (int)(
-        (data[*pos + 0]) |
-        (data[*pos + 1] << 8) |
-        (data[*pos + 2] << 16) |
-        (data[*pos + 3] << 24)
+        (uint32_t)data[*pos + 0]       |
+        (uint32_t)data[*pos + 1] << 8  |
+        (uint32_t)data[*pos + 2] << 16 |
+        (uint32_t)data[*pos + 3] << 24
     );
     *pos += 4;
     return val;
 }
 
-int loadFromFlash(const uint32_t* data, int dataSize) {
+static uint8_t readByte(const uint8_t* data, int* pos) {
+    return data[(*pos)++];
+}
+
+int loadFromFlash(const uint8_t* data, int dataSize) {
     int pos = 0;
 
-    uint8_t sig0 = (uint8_t)data[pos++];
-    uint8_t sig1 = (uint8_t)data[pos++];
-    if (sig0 != 0xFE || sig1 != 0xFA) {
+    uint8_t sig0 = data[pos++];
+    uint8_t sig1 = data[pos++];
+    if (sig0 != 0xFE || sig1 != 0xFB) {
         send_uart("Invalid signature\n");
+        if (sig1 == 0xFA) {
+            send_uart("v1 Precompiled Lumen binaries are not compatible with v2 Lumen runtime\n");
+        }
         return -1;
     }
 
+    // bytecode
     int bcSize = readInt(data, &pos);
     if (g_bytecode) free(g_bytecode);
-    g_bytecode = (int*)malloc(bcSize * sizeof(int));
+    g_bytecode = (uint8_t*)malloc(bcSize * sizeof(uint8_t));
     if (!g_bytecode) { send_uart("malloc failed\n"); return -1; }
     g_bytecodeSize = bcSize;
     for (int i = 0; i < bcSize; i++) {
-        g_bytecode[i] = readInt(data, &pos);
+        g_bytecode[i] = readByte(data, &pos);
     }
 
+    // string pool
     int spSize = readInt(data, &pos);
     for (int i = 0; i < g_stringPoolSize; i++) {
         if (g_stringPool[i]) { free(g_stringPool[i]); g_stringPool[i] = NULL; }
@@ -80,12 +114,21 @@ int loadFromFlash(const uint32_t* data, int dataSize) {
         g_stringPool[i] = (char*)malloc(len + 1);
         if (!g_stringPool[i]) return -1;
         for (int j = 0; j < len; j++) {
-            g_stringPool[i][j] = (char)data[pos++];
+            g_stringPool[i][j] = (char)readByte(data, &pos);
         }
         g_stringPool[i][len] = '\0';
     }
 
-    g_variableIndex = readInt(data, &pos);
+    // const pool
+    int cpSize = readInt(data, &pos);
+    g_constPoolSize = cpSize;
+    for (int i = 0; i < cpSize; i++) {
+        g_constPool[i] = readInt(data, &pos);
+    }
+
+    // variable count
+    g_variableCount = readInt(data, &pos);
+
     return 0;
 }
 
@@ -127,8 +170,8 @@ void fn_println(Variant stack[16], Variant variables[16], int* sp) {
         send_uart(arg->data.str);
         send_uart("\n");
     } else {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%lld\n", arg->data.i);
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%d\n", (long)arg->data.i);
         send_uart(buf);
     }
 }
@@ -139,16 +182,104 @@ void fn_print(Variant stack[16], Variant variables[16], int* sp) {
     if(arg->type == TAG_STRING) {
         send_uart(arg->data.str);
     } else {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%lld", arg->data.i);
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%d\n", (int)arg->data.i);
         send_uart(buf);
     }
 }
 
 void fn_inputInt(Variant stack[16], Variant variables[16], int* sp) {
+    Variant* varRef = &stack[*sp];
+    (*sp)--;
+
+    char buffer[32];
+    uart_readline(buffer, sizeof(buffer));
+
+    int32_t value = 0;
+
+    char* end;
+    value = strtoll(buffer, &end, 10);
+
+    if(*end != '\0') {
+        send_uart("Invalid value!\n");
+        value = 0;
+    }
+
+    variables[varRef->data.i].type = TAG_INT;
+    variables[varRef->data.i].data.i = value;
 }
 
 void fn_inputStr(Variant stack[16], Variant variables[16], int* sp) {
+    Variant* varRef = &stack[*sp];
+    (*sp)--;
+
+    char buffer[64];
+    uart_readline(buffer, sizeof(buffer));
+
+    char* str = malloc(strlen(buffer) + 1);
+
+    if(!str)
+        return;
+
+    strcpy(str, buffer);
+
+    variables[varRef->data.i].type = TAG_STRING;
+    variables[varRef->data.i].data.str = str;
+}
+
+void fn_str2int(Variant stack[16], Variant variables[16], int* sp) {
+    Variant* varRef = &stack[*sp];
+    (*sp)--;
+
+    Variant* value = &stack[*sp];
+    (*sp)--;
+
+    bool isStr = variables[varRef->data.i].type == TAG_STRING;
+
+    char* str;
+    if(isStr)
+        str = variables[varRef->data.i].data.str;
+
+    char* end;
+    errno = 0;
+
+    long val = isStr ? strtol(str, &end, 10) : 0;
+
+    if (end == str) {
+        val = 0;
+    } else if (errno == ERANGE) {
+        val = 0;
+    } else if(!isStr) {
+        val = 0;
+    }
+
+    variables[varRef->data.i].type = TAG_STRING;
+    variables[varRef->data.i].data.i = (int)val;
+} 
+
+void fn_int2str(Variant stack[16], Variant variables[16], int* sp) {
+    Variant* varRef = &stack[*sp];
+    (*sp)--;
+
+    Variant* value = &stack[*sp];
+    (*sp)--;
+
+    int32_t integer = 0;
+
+    if(value->type == TAG_INT) integer = value->data.i;
+
+    char buf[12];
+    snprintf(buf, sizeof(buf), "%d", integer);
+
+    char* str = malloc(strlen(buf) + 1);
+
+    if(!str)
+        return;
+
+    strcpy(str, buf);
+
+    variables[varRef->data.i].type = TAG_STRING;
+    variables[varRef->data.i].data.str = str;
 }
 
 void fn_gpioInit(Variant stack[16], Variant variables[16], int* sp) {
@@ -214,6 +345,8 @@ NativeFn funcTable[] = {
     fn_println,
     fn_print,
     fn_inputInt,
+    fn_str2int,
+    fn_int2str,
     fn_gpioInit,
     fn_gpioSetDir,
     fn_gpioPut,
@@ -224,7 +357,7 @@ NativeFn funcTable[] = {
 };
 
 int execute(
-    const int* bytecode,
+    const uint8_t* bytecode,
     const int bytecodeSize,
     const char* stringPool[],
     const int stringPoolSize
@@ -279,7 +412,7 @@ int execute(
                         break;
                     case 0x02:
                         v->type = TAG_INT;
-                        v->data.i = (int64_t)value;
+                        v->data.i = (int32_t)g_constPool[value];
                         break;
                     case 0x03: {
                         Variant* var = &variables[value];
@@ -290,6 +423,11 @@ int execute(
                             v->data.str = var->data.str;
                         break;
                     }
+                    case 0x04: {
+                        v->type = TAG_INT;
+                        v->data.i = (int32_t)value;
+                        break;
+                    }
                 }
                 break;
             }
@@ -297,8 +435,8 @@ int execute(
                 int addr = bytecode[PC + 1];
                 int index;
 
-                if(addr >= 0xAA00 && addr <= 0xAABF) {
-                    index = (addr - 0xAA00) + 4;
+                if(addr >= 0xD0 && addr <= 0xFF) {
+                    index = (addr - 0xD0) + 6;
                 }
                 else {
                     index = addr;
@@ -319,48 +457,48 @@ int execute(
                 continue;
             }
             case 0xA0: {
-                int64_t b = stack[stackPointer].data.i; stackPointer--;
-                int64_t a = stack[stackPointer].data.i; stackPointer--;
+                int32_t b = stack[stackPointer].data.i; stackPointer--;
+                int32_t a = stack[stackPointer].data.i; stackPointer--;
                 stackPointer++;
                 stack[stackPointer].type = TAG_INT;
                 stack[stackPointer].data.i = a + b;
                 break;
             }
             case 0xA1: {
-                int64_t b = stack[stackPointer].data.i; stackPointer--;
-                int64_t a = stack[stackPointer].data.i; stackPointer--;
+                int32_t b = stack[stackPointer].data.i; stackPointer--;
+                int32_t a = stack[stackPointer].data.i; stackPointer--;
                 stackPointer++;
                 stack[stackPointer].type = TAG_INT;
                 stack[stackPointer].data.i = a - b;
                 break;
             }
             case 0xA2: {
-                int64_t b = stack[stackPointer].data.i; stackPointer--;
-                int64_t a = stack[stackPointer].data.i; stackPointer--;
+                int32_t b = stack[stackPointer].data.i; stackPointer--;
+                int32_t a = stack[stackPointer].data.i; stackPointer--;
                 stackPointer++;
                 stack[stackPointer].type = TAG_INT;
                 stack[stackPointer].data.i = a * b;
                 break;
             }
             case 0xA3: {
-                int64_t b = stack[stackPointer].data.i; stackPointer--;
-                int64_t a = stack[stackPointer].data.i; stackPointer--;
+                int32_t b = stack[stackPointer].data.i; stackPointer--;
+                int32_t a = stack[stackPointer].data.i; stackPointer--;
                 stackPointer++;
                 stack[stackPointer].type = TAG_INT;
                 stack[stackPointer].data.i = a / b;
                 break;
             }
             case 0xA4: {
-                int64_t b = stack[stackPointer].data.i; stackPointer--;
-                int64_t a = stack[stackPointer].data.i; stackPointer--;
+                int32_t b = stack[stackPointer].data.i; stackPointer--;
+                int32_t a = stack[stackPointer].data.i; stackPointer--;
                 stackPointer++;
                 stack[stackPointer].type = TAG_INT;
-                stack[stackPointer].data.i = (int64_t)pow((double)a, (double)b);
+                stack[stackPointer].data.i = (int32_t)pow((double)a, (double)b);
                 break;
             }
             case 0xA5: {
-                int64_t b = stack[stackPointer].data.i; stackPointer--;
-                int64_t a = stack[stackPointer].data.i; stackPointer--;
+                int32_t b = stack[stackPointer].data.i; stackPointer--;
+                int32_t a = stack[stackPointer].data.i; stackPointer--;
                 stackPointer++;
                 stack[stackPointer].type = TAG_INT;
                 stack[stackPointer].data.i = a % b;
@@ -372,8 +510,8 @@ int execute(
             case 0xB3:
             case 0xB4:
             case 0xB5: {
-                int64_t b = stack[stackPointer].data.i; stackPointer--;
-                int64_t a = stack[stackPointer].data.i; stackPointer--;
+                int32_t b = stack[stackPointer].data.i; stackPointer--;
+                int32_t a = stack[stackPointer].data.i; stackPointer--;
                 int falseIndex = bytecode[PC + 1];
                 int result = 0;
                 switch(opcode) {

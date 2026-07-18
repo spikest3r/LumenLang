@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
 
     out << "#pragma once\n";
     out << "#include <stdint.h>\n\n";
-    out << "const uint32_t program[] = {\n    ";
+    out << "const uint8_t program[] = {\n    ";
 
     for (size_t i = 0; i < bytes.size(); i++) {
         out << "0x" << std::hex << std::setw(2) << std::setfill('0')

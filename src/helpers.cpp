@@ -18,29 +18,44 @@ bool isPureNumber(const std::string& s) {
     });
 }
 
-int resolveVariableIndex(std::string keyword, std::unordered_map<std::string, int>& variableMap, int& variableIndex) {
+int resolveVariableIndex(std::string keyword, CompilerData* data) {
     replaceAll(keyword, "&", "");
-    auto it = variableMap.find(keyword);
+    auto it = data->variableMap.find(keyword);
 
-    if (it != variableMap.end()) {
+    if (it != data->variableMap.end()) {
         return it->second;
     } else {
-        variableMap[keyword] = variableIndex;
-        return variableIndex++;
+        int idx = (int)data->variableMap.size();
+        data->variableMap[keyword] = idx;
+        return idx;
     }
 }
 
-int resolveString(std::string str, std::vector<std::string>& stringPool, std::unordered_map<std::string, int>& stringPoolMap, int& stringIndex) {
+int resolveString(std::string str, CompilerData* data) {
     replaceAll(str, "'", "");
 
-    auto it = stringPoolMap.find(str);
+    auto it = data->stringPoolMap.find(str);
 
-    if (it != stringPoolMap.end()) {
+    if (it != data->stringPoolMap.end()) {
         return it->second;
     } else {
-        stringPoolMap[str] = stringIndex;
-        stringPool.push_back(str);
-        return stringIndex++;
+        int idx = (int)data->stringPool.size();
+        data->stringPoolMap[str] = idx;
+        data->stringPool.push_back(str);
+        return idx;
+    }
+}
+
+int resolveConst(int constValue, CompilerData* data) {
+    auto it = data->constPoolMap.find(constValue);
+
+    if (it != data->constPoolMap.end()) {
+        return it->second;
+    } else {
+        int idx = (int)data->constPool.size();
+        data->constPoolMap[constValue] = idx;
+        data->constPool.push_back(constValue);
+        return idx;
     }
 }
 

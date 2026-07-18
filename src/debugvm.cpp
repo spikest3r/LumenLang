@@ -3,47 +3,29 @@
 #include "tokenizer.h"
 
 void begin_execution(
-    const std::vector<int>& bytecode,
-    const std::vector<std::string>& stringPool,
-    std::vector<Variant>& variables,
-    std::vector<Variant>& stack,
-    std::vector<int>& pcStack,
-    int& PC,
-    bool& halt,
+    VMProgramData* progData,
+    VMExecutionData* execData,
     const std::unordered_set<int>& breakpoints
 );
 
 void step(
-    const std::vector<int>& bytecode,
-    const std::vector<std::string>& stringPool,
-    std::vector<Variant>& variables,
-    std::vector<Variant>& stack,
-    std::vector<int>& pcStack,
-    int& PC,
-    bool& halt
+    VMProgramData* progData,
+    VMExecutionData* execData
 );
 
 void printHelp();
-
 bool askYesNo(const std::string& prompt, bool defaultVal = false);
 
+void zeroExecData(VMExecutionData* execData);
+
 int run_debug(
-    const std::string& filename,
-    const std::vector<int>& bytecode,
-    const std::vector<std::string>& stringPool,
-    const int& variableIndex
+    VMProgramData* progData
 ) {
     std::cout << "Debugger active. 'help' for list of commands" << std::endl;
 
     // vm
-    std::vector<Variant> variables;
-    variables.resize(variableIndex);
-
-    std::vector<Variant> stack;
-    std::vector<int> pcStack;
-
-    int PC = 0;
-    bool halt = false;
+    VMExecutionData execData;
+    execData.variables.resize(progData->variableCount);
 
     // debugger
     std::unordered_set<int> breakpoints;
@@ -82,23 +64,15 @@ int run_debug(
 
             std::cout << "Executing..." << std::endl;
 
-            PC = 0;
-            halt = false;
-            variables.clear();
-            stack.clear();
-            pcStack.clear();
-            variables.resize(variableIndex);
+            zeroExecData(&execData);
 
             begin_execution(
-                bytecode, stringPool,
-                variables, stack, pcStack,
-                PC, halt,
-                breakpoints
+                progData, &execData, breakpoints
             );
 
-            resume = !halt;
+            resume = !execData.halt;
 
-            if(halt) std::cout << "Execution finished" << std::endl;
+            if(execData.halt) std::cout << "Execution finished" << std::endl;
         } else if(command == "stop") {
             if(!resume) {
                 std::cout << "Execution has not started. Use 'run' first." << std::endl;
@@ -147,7 +121,7 @@ int run_debug(
         } else if(command == "pc") {
             if(tokens.size() == 1) {
                 // get pc
-                std::cout << "PC = " << "0x" << std::hex << std::right << std::setw(8) << std::setfill('0') << PC << std::endl;
+                std::cout << "PC = " << "0x" << std::hex << std::right << std::setw(8) << std::setfill('0') << execData.PC << std::endl;
                 std::cout << std::dec;
             } else if(tokens.size() == 2) {
                 // set pc
@@ -155,8 +129,8 @@ int run_debug(
                     std::cout << "Execution has not started. Use 'run' first." << std::endl;
                 } else {
                     int value = std::stoi(tokens[1], nullptr, 16);
-                    PC = value;
-                    std::cout << "PC = " << "0x" << std::hex << std::right << std::setw(8) << std::setfill('0') << PC << std::endl;
+                    execData.PC = value;
+                    std::cout << "PC = " << "0x" << std::hex << std::right << std::setw(8) << std::setfill('0') << execData.PC << std::endl;
                     std::cout << std::dec;
                 }
             }
@@ -165,9 +139,7 @@ int run_debug(
                 std::cout << "Execution has not started. Use 'run' first." << std::endl;
             } else {
                 step(
-                    bytecode, stringPool,
-                    variables, stack, pcStack,
-                    PC, halt
+                    progData, &execData
                 );
             }
         } else if(command == "continue") {
@@ -175,34 +147,29 @@ int run_debug(
                 std::cout << "Execution has not started. Use 'run' first." << std::endl;
             } else {
                 step(
-                    bytecode, stringPool,
-                    variables, stack, pcStack,
-                    PC, halt
+                    progData, &execData
                 );
 
                 begin_execution(
-                    bytecode, stringPool,
-                    variables, stack, pcStack,
-                    PC, halt,
-                    breakpoints
+                    progData, &execData, breakpoints
                 );
 
-                resume = !halt;
+                resume = !execData.halt;
 
-                if(halt) std::cout << "Execution finished" << std::endl;
+                if(execData.halt) std::cout << "Execution finished" << std::endl;
             }
         } else if(command == "stack") {
             if(!resume) {
                 std::cout << "Execution has not started. Use 'run' first." << std::endl;
             } else {
                 std::cout << "Stack (top to bottom):\n";
-                if (stack.empty()) {
+                if (execData.stack.empty()) {
                     std::cout << "  (empty)\n";
                 }
-                for (size_t i = stack.size(); i-- > 0; ) {
-                    std::cout << "  [" << (stack.size() - 1 - i) << "] "
-                            << variantToString(stack[i]);
-                    if (i == stack.size() - 1) std::cout << "  <- top";
+                for (size_t i = execData.stack.size(); i-- > 0; ) {
+                    std::cout << "  [" << (execData.stack.size() - 1 - i) << "] "
+                            << variantToString(execData.stack[i]);
+                    if (i == execData.stack.size() - 1) std::cout << "  <- top";
                     std::cout << "\n";
                 }
             }
@@ -211,22 +178,22 @@ int run_debug(
                 std::cout << "Execution has not started. Use 'run' first." << std::endl;
             } else {
                 std::cout << "Variables:\n";
-                if (variables.empty()) {
+                if (execData.variables.empty()) {
                     std::cout << "  (empty)\n";
                 }
-                for (size_t i = 0; i < variables.size(); i++) {
+                for (size_t i = 0; i < execData.variables.size(); i++) {
                     auto varName = debugSymbolsValid ? debugVariablesMap[i] : std::to_string(i);
                     std::cout << "  [" << varName << "] "
-                            << variantToString(variables[i]);
+                            << variantToString(execData.variables[i]);
                     std::cout << "\n";
                 }
             }
         }
         else if(command == "disassemble") {
             disassemble(
-                bytecode, stringPool, 
+                progData->bytecode, progData->stringPool, progData->constPool,
                 debugSymbolsSpecified ? debugSymbolsFile : "",
-                nullptr, resume ? PC : -1
+                nullptr, resume ? execData.PC : -1
             );
         } else if(command == "debugsymbols") {
             std::cout << "Please specify .dbg file for this binary" << std::endl;
@@ -251,46 +218,32 @@ int run_debug(
 }
 
 void begin_execution(
-    const std::vector<int>& bytecode,
-    const std::vector<std::string>& stringPool,
-    std::vector<Variant>& variables,
-    std::vector<Variant>& stack,
-    std::vector<int>& pcStack,
-    int& PC,
-    bool& halt,
+    VMProgramData* progData,
+    VMExecutionData* execData,
     const std::unordered_set<int>& breakpoints
 ) {
     while(true) {
-        if(breakpoints.count(PC)) {
+        if(breakpoints.count(execData->PC)) {
             std::cout << "Breakpoint hit!" << std::endl;
             return;
         }
         
         step(
-            bytecode, stringPool,
-            variables, stack, pcStack,
-            PC, halt
+            progData, execData
         );
 
-        if(halt) break;
+        if(execData->halt) break;
     }
 }
 
 void step(
-    const std::vector<int>& bytecode,
-    const std::vector<std::string>& stringPool,
-    std::vector<Variant>& variables,
-    std::vector<Variant>& stack,
-    std::vector<int>& pcStack,
-    int& PC,
-    bool& halt
+    VMProgramData* progData,
+    VMExecutionData* execData
 ) {
-    auto opcode = bytecode[PC];
+    auto opcode = progData->bytecode[execData->PC];
     int offset = getOpCodeOffset(opcode);
 
-    int result = execute(bytecode, stringPool, variables, stack, pcStack, PC, halt);
-
-    PC = result;
+    execData->PC = execute(progData, execData);
 }
 
 void printHelp() {
@@ -331,4 +284,17 @@ bool askYesNo(const std::string& prompt, bool defaultVal) {
 
         std::cout << "Invalid option\n";
     }
+}
+
+void zeroExecData(VMExecutionData* execData) {
+    execData->PC = 0;
+    execData->halt = false;
+
+    execData->variables.clear();
+    execData->stack.clear();
+    execData->pcStack.clear();
+
+    int oldSize = (int)execData->variables.size();
+    execData->variables.clear();
+    execData->variables.resize(oldSize);
 }

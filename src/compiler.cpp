@@ -33,50 +33,44 @@ std::unordered_map<std::string, int> funcList = {
     {"int2str", 0x06}
 };
 
-// 0xAA00 - 0xABFF is reserved for embedded functions
+// 0xD0 - 0xFF is reserved for embedded functions
 std::map<std::string, int> picoFuncList = {
-    {"gpioInit", 0xAA00},
-    {"gpioSetDir", 0xAA01},
-    {"gpioPut", 0xAA02},
-    {"sleepMs", 0xAA03},
-    {"gpioGet", 0xAA04},
-    {"gpioPullUp", 0xAA05},
-    {"gpioPullDown", 0xAA06}
+    {"gpioInit", 0xD0},
+    {"gpioSetDir", 0xD1},
+    {"gpioPut", 0xD2},
+    {"sleepMs", 0xD3},
+    {"gpioGet", 0xD4},
+    {"gpioPullUp", 0xD5},
+    {"gpioPullDown", 0xD6}
 };
 
 void printError(std::string error, int line) {
     std::cerr << "Error on line " << line << std::endl << "  >>> " << error << std::endl;
 }
 
-void pushToStack(std::string token, std::vector<int>& bytecode, 
-    std::unordered_map<std::string, int>& variableMap,
-    std::vector<std::string>& stringPool, std::unordered_map<std::string, int>& stringPoolMap,
-    int& variableIndex, int& stringIndex
-) {
-    bytecode.push_back(0x03); // push to stack
-    if(token.starts_with("'")) {
-        auto strIndex = resolveString(token, stringPool, stringPoolMap, stringIndex);
-        bytecode.push_back(0x01); // string
-        bytecode.push_back(strIndex); // string index
-    } else if(isPureNumber(token)) {
-        // integer
+void pushToStack(std::string token, CompilerData* data) {
+    data->bytecode.push_back(0x03); // PUSH opcode
+
+    if (token.starts_with("'")) {
+        auto strIndex = resolveString(token, data);
+        data->bytecode.push_back(0x01); // operand type: string
+        data->bytecode.push_back(static_cast<uint8_t>(strIndex));
+    } else if (isPureNumber(token)) {
         int x = std::stoi(token);
-        bytecode.push_back(0x02); // int
-        bytecode.push_back(x); // value
+        int idx = resolveConst(x, data);
+        data->bytecode.push_back(0x02); // operand type: int const
+        data->bytecode.push_back(static_cast<uint8_t>(idx)); // <-- use idx, not x
     } else {
-        // assume variable
         bool ref = token.starts_with("&");
-        auto index = resolveVariableIndex(token, variableMap, variableIndex);
-        bytecode.push_back(ref ? 0x02 : 0x03); // variable
-        bytecode.push_back(index); // variable index
+        auto index = resolveVariableIndex(token, data);
+        data->bytecode.push_back(ref ? 0x04 : 0x03); // <-- use fresh opcodes, not reused 0x02/0x03
+        data->bytecode.push_back(static_cast<uint8_t>(index));
     }
 }
 
 int compile(std::string fileName, 
-    std::vector<int>& g_bytecode,
-    std::unordered_map<std::string, int>& variableMap,
-    std::vector<std::string>& stringPool, std::unordered_map<std::string, int>& stringPoolMap,
-    int& variableIndex, int& stringIndex, bool verbose, bool debugInfo, bool picoMode
+    CompilerData* compilerData,
+    bool verbose, bool debugInfo, bool picoMode
 ) {
     if(picoMode) {
         // Add pico-vm specific functions to the function list
@@ -89,7 +83,7 @@ int compile(std::string fileName,
     std::string line;
 
     std::unordered_map<std::string, int> jumpTable;
-    std::unordered_map<int, std::vector<int>> subroutineBytecode;
+    std::unordered_map<int, std::vector<uint8_t>> subroutineBytecode;
     std::unordered_map<std::string, int> subroutineIndexMap;
     std::vector<UnresolvedJump> unresolvedRoutineCalls;
     std::vector<UnresolvedJump> unresolvedJumps;
@@ -118,7 +112,7 @@ int compile(std::string fileName,
         int conditionArgs = 0;
         int varIndex_assign = 0;
         ConditionOp condOp = COP_NONE;
-        std::vector<int>& bytecode = inRoutine ? subroutineBytecode[routineIndex] : g_bytecode;
+        std::vector<uint8_t>& bytecode = inRoutine ? subroutineBytecode[routineIndex] : compilerData->bytecode;
         for(const auto& token: tokens) {
             if(token == "=") {
                 bool fromStack = false;
@@ -187,10 +181,10 @@ int compile(std::string fileName,
                             bytecode.push_back(0x03); // push to stack
                             if(isVar(str)) {
                                 bytecode.push_back(0x03); // variable
-                                auto varIndex = resolveVariableIndex(str, variableMap, variableIndex);
+                                auto varIndex = resolveVariableIndex(str, compilerData);
                                 bytecode.push_back(varIndex); // variable index
                             } else {
-                                auto strIndex = resolveString(str, stringPool, stringPoolMap, stringIndex);
+                                auto strIndex = resolveString(str, compilerData);
                                 bytecode.push_back(0x01); // string
                                 bytecode.push_back(strIndex); // string index
                             }
@@ -198,7 +192,7 @@ int compile(std::string fileName,
                         
                         // push str count
                         bytecode.push_back(0x03); // push to stack
-                        bytecode.push_back(0x02); // int
+                        bytecode.push_back(0x04); // raw uint8_t
                         bytecode.push_back(strs.size()); // value
 
                         bytecode.push_back(0xAA); // join strings
@@ -208,8 +202,7 @@ int compile(std::string fileName,
                         return -1;
                     } else {
                         compileExpression(
-                            formula, bytecode,
-                            variableMap, variableIndex
+                            formula, compilerData
                         ); // result in stack
                         fromStack = true;
                     }
@@ -221,7 +214,7 @@ int compile(std::string fileName,
                 if(!fromStack) op = ASSIGN;
                 if(fromStack) bytecode.push_back(0x02);
                 keyword = tokens[0];
-                auto var_index = resolveVariableIndex(keyword, variableMap, variableIndex);
+                auto var_index = resolveVariableIndex(keyword, compilerData);
                 varIndex_assign = var_index;
                 if(fromStack) bytecode.push_back(var_index);
                 if(fromStack) break;
@@ -334,33 +327,18 @@ int compile(std::string fileName,
                     {
                         routineIndex = routineCount++;
                         subroutineIndexMap[token] = routineIndex;
-                        subroutineBytecode[routineIndex] = std::vector<int>();
+                        subroutineBytecode[routineIndex] = std::vector<uint8_t>();
                     }
                     break;
                 case ASSIGN:
-                    bytecode.push_back(0x03); // PUSH
-                    if(token.starts_with("'")) { // string
-                        auto strIndex = resolveString(token, stringPool, stringPoolMap, stringIndex);
-                        bytecode.push_back(0x01);
-                        bytecode.push_back(strIndex);
-                    } else if(isVar(token)) {
-                        auto varIndex = resolveVariableIndex(token, variableMap, variableIndex);
-                        bytecode.push_back(0x03);
-                        bytecode.push_back(varIndex);
-                    } 
-                    else {
-                        // assume int for now
-                        int x = std::stoi(token);
-                        bytecode.push_back(0x02);
-                        bytecode.push_back(x);
-                    }
+                    pushToStack(token, compilerData);
                     bytecode.push_back(0x02); // POP
                     bytecode.push_back(varIndex_assign);
                     break;
                 case FUNC_CALL:
                 case PUSH_STACK:
                     {
-                        pushToStack(token, bytecode, variableMap, stringPool, stringPoolMap, variableIndex, stringIndex);
+                        pushToStack(token, compilerData);
                     }
                     break;
                 case LABEL:
@@ -397,7 +375,7 @@ int compile(std::string fileName,
                                 printError("Syntax error", lineIndex);
                                 return -1;
                             }
-                            pushToStack(token, bytecode, variableMap, stringPool, stringPoolMap, variableIndex, stringIndex);
+                            pushToStack(token, compilerData);
                             conditionArgs++;
                         }
                     }
@@ -434,7 +412,7 @@ int compile(std::string fileName,
         lineIndex++;
     }
 
-    g_bytecode.push_back(0xFF); // HALT
+    compilerData->bytecode.push_back(0xFF); // HALT
 
     std::unordered_map<int, int> routineOffsets;
 
@@ -445,7 +423,7 @@ int compile(std::string fileName,
 
             auto it2 = jumpTable.find(keyword);
             if(it2 != jumpTable.end()) {
-                g_bytecode[location] = it2->second;
+                compilerData->bytecode[location] = it2->second;
             } else {
                 printError("Label '" + keyword + "' is not defined", line);
                 return -1;
@@ -455,8 +433,8 @@ int compile(std::string fileName,
         for(const auto& it : subroutineBytecode) {
         auto idx = it.first;
         auto& routineBc = it.second;
-        routineOffsets[idx] = g_bytecode.size(); // offset where this routine starts
-        g_bytecode.insert(g_bytecode.end(), routineBc.begin(), routineBc.end());
+        routineOffsets[idx] = compilerData->bytecode.size(); // offset where this routine starts
+        compilerData->bytecode.insert(compilerData->bytecode.end(), routineBc.begin(), routineBc.end());
     }
 
     for(const auto& it : unresolvedRoutineCalls) {
@@ -468,7 +446,7 @@ int compile(std::string fileName,
 
         if(it2 != subroutineIndexMap.end()) {
             int rIdx = it2->second;
-            g_bytecode[location] = routineOffsets[rIdx]; // patch with actual byte offset
+            compilerData->bytecode[location] = routineOffsets[rIdx]; // patch with actual byte offset
         } else {
             printError("Subroutine '" + keyword + "' is not defined", line);
             return -1;
@@ -479,7 +457,7 @@ int compile(std::string fileName,
         std::ofstream debugFile(fileName + ".bin.dbg");
         // write variable names and their indices
         debugFile << "variables" << std::endl;
-        for(const auto& var : variableMap) {
+        for(const auto& var : compilerData->variableMap) {
             debugFile << var.first << " " << var.second << std::endl;
         }
         // write subroutine names, their bytecode offsets and bytecode length
@@ -497,6 +475,8 @@ int compile(std::string fileName,
     }
 
     file.close();
+
+    compilerData->variableCount = (int)compilerData->variableMap.size();
 
     return 0;
 }
