@@ -10,24 +10,14 @@ int64_t getInt(const Variant& v);
 extern std::unordered_map<int, NativeFn> funcMap;
 
 int run(
-    const std::vector<int>& bytecode,
-    const std::vector<std::string>& stringPool,
-    const int& variableIndex
+    VMProgramData* progData
 );
 
 int run_debug(
-    const std::string& filename,
-    const std::vector<int>& bytecode,
-    const std::vector<std::string>& stringPool,
-    const int& variableIndex
+    VMProgramData* progData
 );
 
 int execute(
-    const std::vector<int>& bytecode,
-    const std::vector<std::string>& stringPool,
-    std::vector<Variant>& variables,
-    std::vector<Variant>& stack,
-    std::vector<int>& pcStack,
-    const int& PC,
-    bool& halt
+    VMProgramData* progData,
+    VMExecutionData* execData
 );

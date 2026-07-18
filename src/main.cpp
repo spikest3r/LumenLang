@@ -3,6 +3,7 @@
 #include "disassembler.h"
 #include "programfile.h"
 #include "examples.h"
+#include "types.h"
 
 int stringIndex = 0;
 int variableIndex = 0;
@@ -137,20 +138,14 @@ int main(int argc, char** argv) {
     if(disassembleFlag) {
         BinaryProgram inProg;
         inProg.load(file_name);
-        disassemble(inProg.bytecode, inProg.stringPool, file_name + ".dbg");
+        disassemble(inProg.bytecode, inProg.stringPool, inProg.constPool, file_name + ".dbg");
     }
 
     if(compileFlag) {
-        std::vector<int> bytecode;
-        std::vector<std::string> stringPool;
-
-        std::unordered_map<std::string, int> variableMap;
-        std::unordered_map<std::string, int> stringPoolMap;
+        CompilerData data;
 
         int status = compile(
-            file_name, 
-            bytecode, variableMap, stringPool, stringPoolMap, 
-            variableIndex, stringIndex, verboseFlag, debugInfo
+            file_name, &data, verboseFlag, debugInfo
         );
 
         if(status != 0) {
@@ -160,7 +155,7 @@ int main(int argc, char** argv) {
 
         if(verboseFlag) {
             std::cout << "Bytecode: ";
-            for (uint8_t b : bytecode) {
+            for (uint8_t b : data.bytecode) {
                 std::cout << std::hex << std::setw(2) << std::setfill('0')
                         << static_cast<int>(b) << " ";
             }
@@ -169,9 +164,10 @@ int main(int argc, char** argv) {
         }
 
         BinaryProgram outProg;
-        outProg.bytecode = bytecode;
-        outProg.stringPool = stringPool;
-        outProg.variableIndex = variableIndex;
+        outProg.bytecode = data.bytecode;
+        outProg.stringPool = data.stringPool;
+        outProg.constPool = data.constPool;
+        outProg.variableCount = data.variableCount;
         outProg.save(file_name + ".bin");
     }
 
@@ -183,20 +179,18 @@ int main(int argc, char** argv) {
         
         int status = -1;
 
+        VMProgramData progData;
+        constructProgData(&progData, &inProg);
+
         if(debuggerActive) {
             status = run_debug(
-                file_name,
-                inProg.bytecode,
-                inProg.stringPool,
-                inProg.variableIndex
+                &progData
             );
         } else {
             if(verboseFlag) std::cout << "Executing..." << std::endl;
 
             status = run(
-                inProg.bytecode,
-                inProg.stringPool,
-                inProg.variableIndex
+                &progData
             );
 
             if(verboseFlag) std::cout << "Execution finished" << std::endl;

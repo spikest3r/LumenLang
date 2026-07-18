@@ -50,7 +50,7 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 target_include_directories(${PROJECT_NAME} PRIVATE include)
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
-    LUMEN_VERSION="1.1"
+    LUMEN_VERSION="2.0"
     GIT_BRANCH="${GIT_BRANCH}"
     GIT_COMMIT="${GIT_COMMIT}"
     BUILD_DATE="${BUILD_DATE}"
