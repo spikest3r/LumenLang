@@ -85,17 +85,21 @@ static std::vector<std::string> shuntingYard(const std::vector<std::string> &tok
     return out;
 }
 
-static void evalRPN(const std::vector<std::string> &rpn, std::vector<int>& bytecode, std::unordered_map<std::string, int>& variableMap, int& variableIndex) {
+static void evalRPN(const std::vector<std::string> &rpn, CompilerData* data) {
     std::vector<std::string> stack;
+
+    auto& bytecode = data->bytecode;
 
     for (const std::string &t : rpn) {
         if (isNum(t)) {
             bytecode.push_back(0x03);
             bytecode.push_back(0x02); // type 2 = int
-            bytecode.push_back(std::stoi(t));
+            int constValue = std::stoi(t);
+            int constIndex = resolveConst(constValue, data);
+            bytecode.push_back(constIndex);
             stack.push_back(t);
         } else if (isVar(t)) {
-            int varIndex = resolveVariableIndex(t, variableMap, variableIndex);
+            int varIndex = resolveVariableIndex(t, data);
             bytecode.push_back(0x03);
             bytecode.push_back(0x03); // type 3 = variable
             bytecode.push_back(varIndex);
@@ -119,8 +123,8 @@ static void evalRPN(const std::vector<std::string> &rpn, std::vector<int>& bytec
     }
 }
 
-void compileExpression(std::string expr, std::vector<int>& bytecode, std::unordered_map<std::string, int>& variableMap, int& variableIndex) {
+void compileExpression(std::string expr, CompilerData* data) {
     auto tokens = tokenize(expr);
     auto rpn    = shuntingYard(tokens);
-    return evalRPN(rpn, bytecode, variableMap, variableIndex);
+    return evalRPN(rpn, data);
 }

@@ -20,31 +20,43 @@ int runVM() {
         std::cerr << "bytecode empty, did load succeed?\n";
         return -1;
     }
-    return run(program.bytecode, program.stringPool, program.variableIndex);
+    VMProgramData progData;
+    constructProgData(&progData, &program);
+    return run(&progData);
 }
 
 int compileScript(const std::string& script) {
     // TODO: Pass flags
-    return compile(
+    CompilerData data;
+
+    int status = compile(
         script,
-        program.bytecode,
-        program.stringPool,
-        program.variableIndex,
+        &data,
         false,
         false
     );
+
+    if(status != 0) return status;
+
+    program.bytecode = data.bytecode;
+    program.stringPool = data.stringPool;
+    program.constPool = data.constPool;
+    program.variableCount = data.variableCount;
+
+    return status;
 }
 
 void init() {
     program.bytecode = {};
     program.stringPool = {};
-    program.variableIndex = 0;
+    program.variableCount = 0;
 }
 
 std::string disassembleBin() {
     return disassemble(
         program.bytecode,
-        program.stringPool
+        program.stringPool,
+        program.constPool
     );
 }
 

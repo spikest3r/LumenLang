@@ -4,8 +4,8 @@ set -e
 
 echo "FizzBuzz test"
 
-SCRIPT="./build/interpreter"
-FILE="examples/fizzbuzz.script"
+SCRIPT="./build/lumen"
+FILE="examples/fizzbuzz.lmn"
 
 EXPECTED=$(cat << 'EOF'
 N=

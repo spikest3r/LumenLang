@@ -37,34 +37,29 @@ void printError(std::string error, int line) {
     std::cerr << "Error on line " << line << std::endl << "  >>> " << error << std::endl;
 }
 
-void pushToStack(std::string token, std::vector<int>& bytecode, 
-    std::unordered_map<std::string, int>& variableMap,
-    std::vector<std::string>& stringPool, std::unordered_map<std::string, int>& stringPoolMap,
-    int& variableIndex, int& stringIndex
-) {
-    bytecode.push_back(0x03); // push to stack
-    if(token.starts_with("'")) {
-        auto strIndex = resolveString(token, stringPool, stringPoolMap, stringIndex);
-        bytecode.push_back(0x01); // string
-        bytecode.push_back(strIndex); // string index
-    } else if(isPureNumber(token)) {
-        // integer
+void pushToStack(std::string token, CompilerData* data) {
+    data->bytecode.push_back(0x03); // PUSH opcode
+
+    if (token.starts_with("'")) {
+        auto strIndex = resolveString(token, data);
+        data->bytecode.push_back(0x01); // operand type: string
+        data->bytecode.push_back(static_cast<uint8_t>(strIndex));
+    } else if (isPureNumber(token)) {
         int x = std::stoi(token);
-        bytecode.push_back(0x02); // int
-        bytecode.push_back(x); // value
+        int idx = resolveConst(x, data);
+        data->bytecode.push_back(0x02); // operand type: int const
+        data->bytecode.push_back(static_cast<uint8_t>(idx)); // <-- use idx, not x
     } else {
-        // assume variable
         bool ref = token.starts_with("&");
-        auto index = resolveVariableIndex(token, variableMap, variableIndex);
-        bytecode.push_back(ref ? 0x02 : 0x03); // variable
-        bytecode.push_back(index); // variable index
+        auto index = resolveVariableIndex(token, data);
+        data->bytecode.push_back(ref ? 0x04 : 0x03); // <-- use fresh opcodes, not reused 0x02/0x03
+        data->bytecode.push_back(static_cast<uint8_t>(index));
     }
 }
 
 int compile(const std::string& script, 
-    std::vector<int>& g_bytecode,
-    std::vector<std::string>& stringPool,
-    int& variableIndex, bool verbose, bool debugInfo
+    CompilerData* compilerData,
+    bool verbose, bool debugInfo
 ) {
     std::istringstream stream(script);
     std::string line;
@@ -74,7 +69,7 @@ int compile(const std::string& script,
     std::unordered_map<std::string, int> stringPoolMap;
 
     std::unordered_map<std::string, int> jumpTable;
-    std::unordered_map<int, std::vector<int>> subroutineBytecode;
+    std::unordered_map<int, std::vector<uint8_t>> subroutineBytecode;
     std::unordered_map<std::string, int> subroutineIndexMap;
     std::vector<UnresolvedJump> unresolvedRoutineCalls;
     std::vector<UnresolvedJump> unresolvedJumps;
@@ -103,7 +98,7 @@ int compile(const std::string& script,
         int conditionArgs = 0;
         int varIndex_assign = 0;
         ConditionOp condOp = COP_NONE;
-        std::vector<int>& bytecode = inRoutine ? subroutineBytecode[routineIndex] : g_bytecode;
+        std::vector<uint8_t>& bytecode = inRoutine ? subroutineBytecode[routineIndex] : compilerData->bytecode;
         for(const auto& token: tokens) {
             if(token == "=") {
                 bool fromStack = false;
@@ -172,10 +167,10 @@ int compile(const std::string& script,
                             bytecode.push_back(0x03); // push to stack
                             if(isVar(str)) {
                                 bytecode.push_back(0x03); // variable
-                                auto varIndex = resolveVariableIndex(str, variableMap, variableIndex);
+                                auto varIndex = resolveVariableIndex(str, compilerData);
                                 bytecode.push_back(varIndex); // variable index
                             } else {
-                                auto strIndex = resolveString(str, stringPool, stringPoolMap, stringIndex);
+                                auto strIndex = resolveString(str, compilerData);
                                 bytecode.push_back(0x01); // string
                                 bytecode.push_back(strIndex); // string index
                             }
@@ -183,7 +178,7 @@ int compile(const std::string& script,
                         
                         // push str count
                         bytecode.push_back(0x03); // push to stack
-                        bytecode.push_back(0x02); // int
+                        bytecode.push_back(0x04); // raw uint8_t
                         bytecode.push_back(strs.size()); // value
 
                         bytecode.push_back(0xAA); // join strings
@@ -193,8 +188,7 @@ int compile(const std::string& script,
                         return -1;
                     } else {
                         compileExpression(
-                            formula, bytecode,
-                            variableMap, variableIndex
+                            formula, compilerData
                         ); // result in stack
                         fromStack = true;
                     }
@@ -206,7 +200,7 @@ int compile(const std::string& script,
                 if(!fromStack) op = ASSIGN;
                 if(fromStack) bytecode.push_back(0x02);
                 keyword = tokens[0];
-                auto var_index = resolveVariableIndex(keyword, variableMap, variableIndex);
+                auto var_index = resolveVariableIndex(keyword, compilerData);
                 varIndex_assign = var_index;
                 if(fromStack) bytecode.push_back(var_index);
                 if(fromStack) break;
@@ -319,33 +313,18 @@ int compile(const std::string& script,
                     {
                         routineIndex = routineCount++;
                         subroutineIndexMap[token] = routineIndex;
-                        subroutineBytecode[routineIndex] = std::vector<int>();
+                        subroutineBytecode[routineIndex] = std::vector<uint8_t>();
                     }
                     break;
                 case ASSIGN:
-                    bytecode.push_back(0x03); // PUSH
-                    if(token.starts_with("'")) { // string
-                        auto strIndex = resolveString(token, stringPool, stringPoolMap, stringIndex);
-                        bytecode.push_back(0x01);
-                        bytecode.push_back(strIndex);
-                    } else if(isVar(token)) {
-                        auto varIndex = resolveVariableIndex(token, variableMap, variableIndex);
-                        bytecode.push_back(0x03);
-                        bytecode.push_back(varIndex);
-                    } 
-                    else {
-                        // assume int for now
-                        int x = std::stoi(token);
-                        bytecode.push_back(0x02);
-                        bytecode.push_back(x);
-                    }
+                    pushToStack(token, compilerData);
                     bytecode.push_back(0x02); // POP
                     bytecode.push_back(varIndex_assign);
                     break;
                 case FUNC_CALL:
                 case PUSH_STACK:
                     {
-                        pushToStack(token, bytecode, variableMap, stringPool, stringPoolMap, variableIndex, stringIndex);
+                        pushToStack(token, compilerData);
                     }
                     break;
                 case LABEL:
@@ -382,7 +361,7 @@ int compile(const std::string& script,
                                 printError("Syntax error", lineIndex);
                                 return -1;
                             }
-                            pushToStack(token, bytecode, variableMap, stringPool, stringPoolMap, variableIndex, stringIndex);
+                            pushToStack(token, compilerData);
                             conditionArgs++;
                         }
                     }
@@ -419,7 +398,7 @@ int compile(const std::string& script,
         lineIndex++;
     }
 
-    g_bytecode.push_back(0xFF); // HALT
+    compilerData->bytecode.push_back(0xFF); // HALT
 
     std::unordered_map<int, int> routineOffsets;
 
@@ -430,7 +409,7 @@ int compile(const std::string& script,
 
             auto it2 = jumpTable.find(keyword);
             if(it2 != jumpTable.end()) {
-                g_bytecode[location] = it2->second;
+                compilerData->bytecode[location] = it2->second;
             } else {
                 printError("Label '" + keyword + "' is not defined", line);
                 return -1;
@@ -440,8 +419,8 @@ int compile(const std::string& script,
         for(const auto& it : subroutineBytecode) {
         auto idx = it.first;
         auto& routineBc = it.second;
-        routineOffsets[idx] = g_bytecode.size(); // offset where this routine starts
-        g_bytecode.insert(g_bytecode.end(), routineBc.begin(), routineBc.end());
+        routineOffsets[idx] = compilerData->bytecode.size(); // offset where this routine starts
+        compilerData->bytecode.insert(compilerData->bytecode.end(), routineBc.begin(), routineBc.end());
     }
 
     for(const auto& it : unresolvedRoutineCalls) {
@@ -453,7 +432,7 @@ int compile(const std::string& script,
 
         if(it2 != subroutineIndexMap.end()) {
             int rIdx = it2->second;
-            g_bytecode[location] = routineOffsets[rIdx]; // patch with actual byte offset
+            compilerData->bytecode[location] = routineOffsets[rIdx]; // patch with actual byte offset
         } else {
             printError("Subroutine '" + keyword + "' is not defined", line);
             return -1;

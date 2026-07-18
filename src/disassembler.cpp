@@ -111,7 +111,7 @@ std::unordered_map<uint32_t, std::string> buildRoutineStarts(
     return routineStarts;
 }
 
-std::string disassemble(std::vector<int> bytecode, std::vector<std::string> stringPool, 
+std::string disassemble(std::vector<uint8_t> bytecode, std::vector<std::string> stringPool, std::vector<int> constPool,
     std::string debugFile, bool* debugSymbolsLoaded, int vmPC
 ) {
     int PC = 0;
@@ -200,7 +200,7 @@ std::string disassemble(std::vector<int> bytecode, std::vector<std::string> stri
                                 ss << " '" << stringPool[bytecode[PC + 2]] << "'";
                             } else if(hasDebugData) { 
                                 if(bytecode[PC + 1] == 0x02) {
-                                    ss << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
+                                    ss << " " << std::dec << static_cast<int>(constPool[bytecode[PC + 2]]);
                                 } else if(bytecode[PC + 1] == 0x03) {
                                     ss << " " << variables_debug[bytecode[PC + 2]];
                                 }

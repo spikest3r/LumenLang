@@ -12,6 +12,21 @@ typedef struct {
     std::variant<int64_t, double, std::string> data;
 } Variant;
 
+struct VMProgramData {
+    std::vector<uint8_t> bytecode;
+    std::vector<std::string> stringPool;
+    std::vector<int> constPool;
+    int variableCount = 0;
+};
+
+struct VMExecutionData {
+    std::vector<Variant> variables;
+    std::vector<Variant> stack;
+    std::vector<int> pcStack;
+    int PC = 0;
+    bool halt = 0;
+};
+
 typedef enum {
     NONE,
     ASSIGN,
