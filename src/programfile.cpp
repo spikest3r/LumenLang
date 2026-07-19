@@ -4,8 +4,7 @@ bool BinaryProgram::save(const std::string& path) {
     std::ofstream out(path, std::ios::binary);
     if (!out) return false;
 
-    // signature FE FB (v2)
-    unsigned char sig[2] = {0xFE, 0xFB};
+    unsigned char sig[2] = {0xFE, 0xFC};
     out.write(reinterpret_cast<char*>(sig), 2);
 
     // bytecode
@@ -23,10 +22,10 @@ bool BinaryProgram::save(const std::string& path) {
         out.write(str.data(), len);
     }
     
-    // const pool
+    // const pool (double, v3+)
     int cpSize = (int)constPool.size();
     out.write(reinterpret_cast<char*>(&cpSize), sizeof(int));
-    out.write(reinterpret_cast<char*>(constPool.data()), cpSize * sizeof(int));
+    out.write(reinterpret_cast<char*>(constPool.data()), cpSize * sizeof(double));
 
     // variable index
     out.write(reinterpret_cast<char*>(&variableCount), sizeof(int));
@@ -43,12 +42,16 @@ bool BinaryProgram::load(const std::string& path) {
     in.read(reinterpret_cast<char*>(sig), 2);
 
     // FE FA (v1)
-    // FE FB (v2)
+    // FE FB (v2) - constPool of int
+    // FE FC (v2.1) - constPool of double
 
-    if (sig[0] != 0xFE || sig[1] != 0xFB) {
+    bool isV2 = (sig[0] == 0xFE && sig[1] == 0xFB);
+    bool isV3 = (sig[0] == 0xFE && sig[1] == 0xFC);
+
+    if (!isV2 && !isV3) {
         std::cerr << "Invalid signature\n";
-        if(sig[1] == 0xFA) {
-            std::cout << "v1 Precompiled Lumen binaries are not compatible with v2 Lumen runtime" << std::endl;
+        if (sig[0] == 0xFE && sig[1] == 0xFA) {
+            std::cout << "v1 Precompiled Lumen binaries are not compatible with v2+ Lumen runtime" << std::endl;
         }
         return false;
     }
@@ -81,8 +84,18 @@ bool BinaryProgram::load(const std::string& path) {
     int cpSize = 0;
     in.read(reinterpret_cast<char*>(&cpSize), sizeof(int));
 
-    constPool.resize(cpSize);
-    in.read(reinterpret_cast<char*>(constPool.data()), cpSize * sizeof(int));
+    if (isV3) {
+        constPool.resize(cpSize);
+        in.read(reinterpret_cast<char*>(constPool.data()), cpSize * sizeof(double));
+    } else {
+        std::vector<int> legacyConstPool(cpSize);
+        in.read(reinterpret_cast<char*>(legacyConstPool.data()), cpSize * sizeof(int));
+
+        constPool.resize(cpSize);
+        for (int i = 0; i < cpSize; i++) {
+            constPool[i] = static_cast<double>(legacyConstPool[i]);
+        }
+    }
 
     // variable count
     in.read(reinterpret_cast<char*>(&variableCount), sizeof(int));

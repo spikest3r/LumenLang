@@ -3,8 +3,9 @@
 static bool isNum(const std::string &s) {
     if (s.empty()) return false;
     try {
-        std::stof(s);
-        return true;
+        size_t pos = 0;
+        std::stod(s, &pos);
+        return pos == s.size(); // reject partial parses like "1.2.3" or "3abc"
     } catch (...) {
         return false;
     }
@@ -33,6 +34,13 @@ static std::vector<std::string> tokenize(const std::string &expr) {
 
         // unary minus: at start, after another operator, or after '('
         if (ch == '-' && (i == 0 || isOp(expr[i - 1]) || expr[i - 1] == '(')) {
+            buf += ch;
+            continue;
+        }
+
+        if ((ch == '+' || ch == '-') && !buf.empty() &&
+            (buf.back() == 'e' || buf.back() == 'E') &&
+            isNum(buf + "0")) { // buf+"0" e.g. "3e0" parses as a number => buf is a numeric prefix
             buf += ch;
             continue;
         }
@@ -94,16 +102,20 @@ static void evalRPN(const std::vector<std::string> &rpn, CompilerData* data) {
 
     for (const std::string &t : rpn) {
         if (isNum(t)) {
+            bool isFloat = isFloatLiteral(t);
+            TypeTag tag = isFloat ? TAG_FLOAT : TAG_INT;
+            uint8_t dataType = isFloat ? 0x05 : 0x02;
+            double constValue = std::stod(t);
+            int constIndex = resolveConst(constValue, tag, data);
+
             bytecode.push_back(0x03);
-            bytecode.push_back(0x02); // type 2 = int
-            int constValue = std::stoi(t);
-            int constIndex = resolveConst(constValue, data);
+            bytecode.push_back(dataType);
             bytecode.push_back(constIndex);
             stack.push_back(t);
         } else if (isVar(t)) {
             int varIndex = resolveVariableIndex(t, data);
             bytecode.push_back(0x03);
-            bytecode.push_back(0x03); // type 3 = variable
+            bytecode.push_back(0x03);
             bytecode.push_back(varIndex);
             stack.push_back(t);
         } else {
@@ -120,7 +132,7 @@ static void evalRPN(const std::vector<std::string> &rpn, CompilerData* data) {
                 case '%': bytecode.push_back(0xA5); break; // MOD
             }
 
-            stack.push_back(t); // result placeholder, consumed by later ops if chained
+            stack.push_back(t);
         }
     }
 }

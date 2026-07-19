@@ -13,9 +13,27 @@ bool isPureNumber(const std::string& s) {
     if (s.empty()) return false;
     size_t start = (s[0] == '-') ? 1 : 0;
     if (start == s.size()) return false; // just "-" alone
-    return std::all_of(s.begin() + start, s.end(), [](unsigned char c) {
-        return std::isdigit(c);
-    });
+
+    bool seenDigit = false;
+    bool seenDot = false;
+    bool seenExp = false;
+    for (size_t i = start; i < s.size(); i++) {
+        unsigned char c = s[i];
+        if (std::isdigit(c)) {
+            seenDigit = true;
+        } else if (c == '.' && !seenDot && !seenExp) {
+            seenDot = true;
+        } else if ((c == 'e' || c == 'E') && !seenExp && seenDigit) {
+            seenExp = true;
+            // optional sign right after the exponent marker
+            if (i + 1 < s.size() && (s[i + 1] == '+' || s[i + 1] == '-')) {
+                i++;
+            }
+        } else {
+            return false;
+        }
+    }
+    return seenDigit;
 }
 
 int resolveVariableIndex(std::string keyword, CompilerData* data) {
@@ -46,17 +64,18 @@ int resolveString(std::string str, CompilerData* data) {
     }
 }
 
-int resolveConst(int constValue, CompilerData* data) {
-    auto it = data->constPoolMap.find(constValue);
+int resolveConst(double constValue, TypeTag type, CompilerData* data) {
+    std::pair<int, double> key = {static_cast<int>(type), constValue};
 
+    auto it = data->constPoolMap.find(key);
     if (it != data->constPoolMap.end()) {
         return it->second;
-    } else {
-        int idx = (int)data->constPool.size();
-        data->constPoolMap[constValue] = idx;
-        data->constPool.push_back(constValue);
-        return idx;
     }
+
+    int index = static_cast<int>(data->constPool.size());
+    data->constPool.push_back(constValue);
+    data->constPoolMap[key] = index;
+    return index;
 }
 
 int getOpCodeOffset(int opcode) {
@@ -103,9 +122,19 @@ std::string variantToString(const Variant& v) {
     switch (v.type) {
         case TAG_INT:
             return std::to_string(std::get<int64_t>(v.data));
+        case TAG_FLOAT:
+            return std::to_string(std::get<double>(v.data));
         case TAG_STRING:
             return "'" + std::get<std::string>(v.data) + "'";
         default:
             return "<unknown type>";
     }
+}
+
+// A literal is a float if it contains a decimal point or an exponent.
+// "3" -> int, "3.0" -> float, "3e2" -> float, "-3.5" -> float.
+bool isFloatLiteral(const std::string &s) {
+    return s.find('.') != std::string::npos ||
+           s.find('e') != std::string::npos ||
+           s.find('E') != std::string::npos;
 }

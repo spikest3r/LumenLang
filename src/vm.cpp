@@ -4,6 +4,15 @@ int64_t getInt(const Variant& v) {
     return std::get<int64_t>(v.data);
 }
 
+double getNumeric(const Variant& v) {
+    if (v.type == TAG_FLOAT) return std::get<double>(v.data);
+    return static_cast<double>(std::get<int64_t>(v.data));
+}
+
+bool isFloatVariant(const Variant& a, const Variant& b) {
+    return a.type == TAG_FLOAT || b.type == TAG_FLOAT;
+}
+
 int run(
     VMProgramData* progData
 ) {
@@ -60,6 +69,9 @@ int execute(
                     case TAG_INT:
                         execData->variables[varIndex].data = std::get<int64_t>(var.data);
                         break;
+                    case TAG_FLOAT:
+                        execData->variables[varIndex].data = std::get<double>(var.data);
+                        break;
                     case TAG_STRING:
                         execData->variables[varIndex].data = std::get<std::string>(var.data);
                         break;
@@ -76,7 +88,7 @@ int execute(
                         execData->stack.push_back({TAG_STRING, progData->stringPool[value]});
                         break;
                     case 0x02:
-                        execData->stack.push_back({TAG_INT, progData->constPool[value]});
+                        execData->stack.push_back({TAG_INT, static_cast<int64_t>(progData->constPool[value])});
                         break;
                     case 0x03:
                         {
@@ -87,8 +99,11 @@ int execute(
                     case 0x04:
                         {
                             // raw uint8_t passed
-                            execData->stack.push_back({TAG_INT, static_cast<int>(value)});
+                            execData->stack.push_back({TAG_INT, static_cast<int64_t>(value)});
                         }
+                        break;
+                    case 0x05:
+                        execData->stack.push_back({TAG_FLOAT, progData->constPool[value]});
                         break;
                 }
             }
@@ -114,8 +129,13 @@ int execute(
             Variant b = execData->stack.back(); execData->stack.pop_back();
             Variant a = execData->stack.back(); execData->stack.pop_back();
             Variant result;
-            result.type = TAG_INT;
-            result.data = getInt(a) + getInt(b);
+            if (isFloatVariant(a, b)) {
+                result.type = TAG_FLOAT;
+                result.data = getNumeric(a) + getNumeric(b);
+            } else {
+                result.type = TAG_INT;
+                result.data = getInt(a) + getInt(b);
+            }
             execData->stack.push_back(result);
             break;
         }
@@ -123,8 +143,13 @@ int execute(
             Variant b = execData->stack.back(); execData->stack.pop_back();
             Variant a = execData->stack.back(); execData->stack.pop_back();
             Variant result;
-            result.type = TAG_INT;
-            result.data = getInt(a) - getInt(b);
+            if (isFloatVariant(a, b)) {
+                result.type = TAG_FLOAT;
+                result.data = getNumeric(a) - getNumeric(b);
+            } else {
+                result.type = TAG_INT;
+                result.data = getInt(a) - getInt(b);
+            }
             execData->stack.push_back(result);
             break;
         }
@@ -132,8 +157,13 @@ int execute(
             Variant b = execData->stack.back(); execData->stack.pop_back();
             Variant a = execData->stack.back(); execData->stack.pop_back();
             Variant result;
-            result.type = TAG_INT;
-            result.data = getInt(a) * getInt(b);
+            if (isFloatVariant(a, b)) {
+                result.type = TAG_FLOAT;
+                result.data = getNumeric(a) * getNumeric(b);
+            } else {
+                result.type = TAG_INT;
+                result.data = getInt(a) * getInt(b);
+            }
             execData->stack.push_back(result);
             break;
         }
@@ -141,8 +171,8 @@ int execute(
             Variant b = execData->stack.back(); execData->stack.pop_back();
             Variant a = execData->stack.back(); execData->stack.pop_back();
             Variant result;
-            result.type = TAG_INT;
-            result.data = getInt(a) / getInt(b);
+            result.type = TAG_FLOAT;
+            result.data = getNumeric(a) / getNumeric(b);
             execData->stack.push_back(result);
             break;
         }
@@ -150,8 +180,13 @@ int execute(
             Variant b = execData->stack.back(); execData->stack.pop_back();
             Variant a = execData->stack.back(); execData->stack.pop_back();
             Variant result;
-            result.type = TAG_INT;
-            result.data = static_cast<int64_t>(std::pow(getInt(a), getInt(b)));
+            if (isFloatVariant(a, b)) {
+                result.type = TAG_FLOAT;
+                result.data = std::pow(getNumeric(a), getNumeric(b));
+            } else {
+                result.type = TAG_INT;
+                result.data = static_cast<int64_t>(std::pow(getNumeric(a), getNumeric(b)));
+            }
             execData->stack.push_back(result);
             break;
         }
@@ -159,8 +194,13 @@ int execute(
             Variant b = execData->stack.back(); execData->stack.pop_back();
             Variant a = execData->stack.back(); execData->stack.pop_back();
             Variant result;
-            result.type = TAG_INT;
-            result.data = getInt(a) % getInt(b);
+            if (isFloatVariant(a, b)) {
+                result.type = TAG_FLOAT;
+                result.data = std::fmod(getNumeric(a), getNumeric(b));
+            } else {
+                result.type = TAG_INT;
+                result.data = getInt(a) % getInt(b);
+            }
             execData->stack.push_back(result);
             break;
         }
@@ -176,8 +216,8 @@ int execute(
             int falseIndex = progData->bytecode[execData->PC + 1];
             
             bool result = false;
-            int64_t av = getInt(a);
-            int64_t bv = getInt(b);
+            double av = getNumeric(a);
+            double bv = getNumeric(b);
             
             switch (opcode) {
                 case 0xB0: result = av == bv; break;
