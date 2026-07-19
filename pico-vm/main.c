@@ -25,27 +25,51 @@ static int g_bytecodeSize = 0;
 static char* g_stringPool[MAX_STRINGS];
 static int g_stringPoolSize = 0;
 
-static int g_constPool[MAX_CONST_POOL];
+static double g_constPool[MAX_CONST_POOL];
 static int g_constPoolSize = 0;
 
 static int g_variableCount = 0;
 
 typedef enum {
+    TAG_STRING = 1,
     TAG_INT = 2,
-    TAG_STRING = 1
+    TAG_FLOAT = 3
 } TypeTag;
 
 typedef struct {
     TypeTag type;
     union {
         int32_t i;
+        double f;
         char* str;
     } data;
 } Variant;
 
+static double getNumeric(const Variant* v) {
+    if(v->type == TAG_FLOAT) return v->data.f;
+    return (double)v->data.i;
+}
+
+static int isFloatVariant(const Variant* a, const Variant* b) {
+    return a->type == TAG_FLOAT || b->type == TAG_FLOAT;
+}
+
 void send_uart(const char* message) {
     uart_puts(UART_ID, message);
     printf("%s", message);
+}
+
+static void uart_put_variant(const Variant* v) {
+    char buf[32];
+    if(v->type == TAG_STRING) {
+        send_uart(v->data.str);
+        return;
+    } else if(v->type == TAG_FLOAT) {
+        snprintf(buf, sizeof(buf), "%f", v->data.f);
+    } else {
+        snprintf(buf, sizeof(buf), "%ld", (long)v->data.i);
+    }
+    send_uart(buf);
 }
 
 void uart_readline(char* buffer, int maxLen) {
@@ -80,15 +104,29 @@ static uint8_t readByte(const uint8_t* data, int* pos) {
     return data[(*pos)++];
 }
 
+static double readDouble(const uint8_t* data, int* pos) {
+    double val;
+    memcpy(&val, &data[*pos], sizeof(double));
+    *pos += sizeof(double);
+    return val;
+}
+
 int loadFromFlash(const uint8_t* data, int dataSize) {
     int pos = 0;
 
     uint8_t sig0 = data[pos++];
     uint8_t sig1 = data[pos++];
-    if (sig0 != 0xFE || sig1 != 0xFB) {
+
+    // FE FA (v1) - not supported
+    // FE FB (v2) - constPool of int32
+    // FE FC (v3) - constPool of double
+    int isV2 = (sig0 == 0xFE && sig1 == 0xFB);
+    int isV3 = (sig0 == 0xFE && sig1 == 0xFC);
+
+    if (!isV2 && !isV3) {
         send_uart("Invalid signature\n");
-        if (sig1 == 0xFA) {
-            send_uart("v1 Precompiled Lumen binaries are not compatible with v2 Lumen runtime\n");
+        if (sig0 == 0xFE && sig1 == 0xFA) {
+            send_uart("v1 Precompiled Lumen binaries are not compatible with v2+ Lumen runtime\n");
         }
         return -1;
     }
@@ -122,8 +160,15 @@ int loadFromFlash(const uint8_t* data, int dataSize) {
     // const pool
     int cpSize = readInt(data, &pos);
     g_constPoolSize = cpSize;
-    for (int i = 0; i < cpSize; i++) {
-        g_constPool[i] = readInt(data, &pos);
+    if (isV3) {
+        for (int i = 0; i < cpSize; i++) {
+            g_constPool[i] = readDouble(data, &pos);
+        }
+    } else {
+        // v2: const pool entries are int32
+        for (int i = 0; i < cpSize; i++) {
+            g_constPool[i] = (double)readInt(data, &pos);
+        }
     }
 
     // variable count
@@ -166,26 +211,14 @@ typedef void (*NativeFn)(Variant stack[16], Variant variables[16], int* sp);
 void fn_println(Variant stack[16], Variant variables[16], int* sp) {
     Variant* arg = &stack[*sp];
     (*sp)--;
-    if(arg->type == TAG_STRING) {
-        send_uart(arg->data.str);
-        send_uart("\n");
-    } else {
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%d\n", (long)arg->data.i);
-        send_uart(buf);
-    }
+    uart_put_variant(arg);
+    send_uart("\n");
 }
 
 void fn_print(Variant stack[16], Variant variables[16], int* sp) {
     Variant* arg = &stack[*sp];
     (*sp)--;
-    if(arg->type == TAG_STRING) {
-        send_uart(arg->data.str);
-    } else {
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%d\n", (int)arg->data.i);
-        send_uart(buf);
-    }
+    uart_put_variant(arg);
 }
 
 void fn_inputInt(Variant stack[16], Variant variables[16], int* sp) {
@@ -234,28 +267,22 @@ void fn_str2int(Variant stack[16], Variant variables[16], int* sp) {
     Variant* value = &stack[*sp];
     (*sp)--;
 
-    bool isStr = variables[varRef->data.i].type == TAG_STRING;
-
-    char* str;
-    if(isStr)
-        str = variables[varRef->data.i].data.str;
+    int isStr = value->type == TAG_STRING;
 
     char* end;
     errno = 0;
 
-    long val = isStr ? strtol(str, &end, 10) : 0;
+    long val = isStr ? strtol(value->data.str, &end, 10) : 0;
 
-    if (end == str) {
+    if (isStr && end == value->data.str) {
         val = 0;
     } else if (errno == ERANGE) {
         val = 0;
-    } else if(!isStr) {
-        val = 0;
     }
 
-    variables[varRef->data.i].type = TAG_STRING;
-    variables[varRef->data.i].data.i = (int)val;
-} 
+    variables[varRef->data.i].type = TAG_INT;
+    variables[varRef->data.i].data.i = (int32_t)val;
+}
 
 void fn_int2str(Variant stack[16], Variant variables[16], int* sp) {
     Variant* varRef = &stack[*sp];
@@ -269,7 +296,56 @@ void fn_int2str(Variant stack[16], Variant variables[16], int* sp) {
     if(value->type == TAG_INT) integer = value->data.i;
 
     char buf[12];
-    snprintf(buf, sizeof(buf), "%d", integer);
+    snprintf(buf, sizeof(buf), "%ld", (long)integer);
+
+    char* str = malloc(strlen(buf) + 1);
+
+    if(!str)
+        return;
+
+    strcpy(str, buf);
+
+    variables[varRef->data.i].type = TAG_STRING;
+    variables[varRef->data.i].data.str = str;
+}
+
+void fn_str2float(Variant stack[16], Variant variables[16], int* sp) {
+    Variant* varRef = &stack[*sp];
+    (*sp)--;
+
+    Variant* value = &stack[*sp];
+    (*sp)--;
+
+    int isStr = value->type == TAG_STRING;
+
+    char* end;
+    errno = 0;
+
+    double val = isStr ? strtod(value->data.str, &end) : 0.0;
+
+    if (isStr && end == value->data.str) {
+        val = 0.0;
+    } else if (errno == ERANGE) {
+        val = 0.0;
+    }
+
+    variables[varRef->data.i].type = TAG_FLOAT;
+    variables[varRef->data.i].data.f = val;
+}
+
+void fn_float2str(Variant stack[16], Variant variables[16], int* sp) {
+    Variant* varRef = &stack[*sp];
+    (*sp)--;
+
+    Variant* value = &stack[*sp];
+    (*sp)--;
+
+    double num = 0.0;
+    if(value->type == TAG_FLOAT) num = value->data.f;
+    else if(value->type == TAG_INT) num = (double)value->data.i;
+
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%f", num);
 
     char* str = malloc(strlen(buf) + 1);
 
@@ -341,20 +417,30 @@ void fn_gpioPullDown(Variant stack[16], Variant variables[16], int* sp) {
 }
 
 NativeFn funcTable[] = {
-    NULL,
-    fn_println,
-    fn_print,
-    fn_inputInt,
-    fn_str2int,
-    fn_int2str,
-    fn_gpioInit,
-    fn_gpioSetDir,
-    fn_gpioPut,
-    fn_sleepMs,
-    fn_gpioGet,
-    fn_gpioPullUp,
-    fn_gpioPullDown
+    NULL,           // 0x00 unused
+    fn_println,     // 0x01
+    fn_print,       // 0x02
+    fn_inputInt,    // 0x03
+    fn_inputStr,    // 0x04
+    fn_str2int,     // 0x05
+    fn_int2str,     // 0x06
+    fn_str2float,   // 0x07
+    fn_float2str,   // 0x08
 };
+
+#define BASE_FUNC_COUNT (sizeof(funcTable) / sizeof(funcTable[0]))
+
+NativeFn customFuncTable[] = {
+    fn_gpioInit,      // 0xD0
+    fn_gpioSetDir,    // 0xD1
+    fn_gpioPut,       // 0xD2
+    fn_sleepMs,       // 0xD3
+    fn_gpioGet,       // 0xD4
+    fn_gpioPullUp,    // 0xD5
+    fn_gpioPullDown,  // 0xD6
+};
+
+#define CUSTOM_FUNC_COUNT (sizeof(customFuncTable) / sizeof(customFuncTable[0]))
 
 int execute(
     const uint8_t* bytecode,
@@ -393,6 +479,9 @@ int execute(
                     case TAG_INT:
                         variables[varIndex].data.i = stack[stackPointer].data.i;
                         break;
+                    case TAG_FLOAT:
+                        variables[varIndex].data.f = stack[stackPointer].data.f;
+                        break;
                     case TAG_STRING:
                         variables[varIndex].data.str = stack[stackPointer].data.str;
                         break;
@@ -419,6 +508,8 @@ int execute(
                         v->type = var->type;
                         if(var->type == TAG_INT)
                             v->data.i = var->data.i;
+                        else if(var->type == TAG_FLOAT)
+                            v->data.f = var->data.f;
                         else
                             v->data.str = var->data.str;
                         break;
@@ -428,27 +519,33 @@ int execute(
                         v->data.i = (int32_t)value;
                         break;
                     }
+                    case 0x05: {
+                        v->type = TAG_FLOAT;
+                        v->data.f = g_constPool[value];
+                        break;
+                    }
                 }
                 break;
             }
             case 0x04: {
                 int addr = bytecode[PC + 1];
-                int index;
 
                 if(addr >= 0xD0 && addr <= 0xFF) {
-                    index = (addr - 0xD0) + 6;
+                    int customIndex = addr - 0xD0;
+                    if(customIndex < 0 || (unsigned)customIndex >= CUSTOM_FUNC_COUNT) {
+                        send_uart("Invalid native call\n");
+                        return -1;
+                    }
+                    if(customFuncTable[customIndex])
+                        customFuncTable[customIndex](stack, variables, &stackPointer);
+                } else {
+                    if(addr < 0 || (unsigned)addr >= BASE_FUNC_COUNT) {
+                        send_uart("Invalid native call\n");
+                        return -1;
+                    }
+                    if(funcTable[addr])
+                        funcTable[addr](stack, variables, &stackPointer);
                 }
-                else {
-                    index = addr;
-                }
-
-                if(index < 0 || index >= sizeof(funcTable)/sizeof(funcTable[0])) {
-                    send_uart("Invalid native call\n");
-                    return -1;
-                }
-
-                if(funcTable[index])
-                    funcTable[index](stack, variables, &stackPointer);
 
                 break;
             }
@@ -456,52 +553,83 @@ int execute(
                 PC = bytecode[PC + 1];
                 continue;
             }
-            case 0xA0: {
-                int32_t b = stack[stackPointer].data.i; stackPointer--;
-                int32_t a = stack[stackPointer].data.i; stackPointer--;
+            case 0xA0: { // ADD
+                Variant b = stack[stackPointer]; stackPointer--;
+                Variant a = stack[stackPointer]; stackPointer--;
                 stackPointer++;
-                stack[stackPointer].type = TAG_INT;
-                stack[stackPointer].data.i = a + b;
+                Variant* r = &stack[stackPointer];
+                if(isFloatVariant(&a, &b)) {
+                    r->type = TAG_FLOAT;
+                    r->data.f = getNumeric(&a) + getNumeric(&b);
+                } else {
+                    r->type = TAG_INT;
+                    r->data.i = a.data.i + b.data.i;
+                }
                 break;
             }
-            case 0xA1: {
-                int32_t b = stack[stackPointer].data.i; stackPointer--;
-                int32_t a = stack[stackPointer].data.i; stackPointer--;
+            case 0xA1: { // SUB
+                Variant b = stack[stackPointer]; stackPointer--;
+                Variant a = stack[stackPointer]; stackPointer--;
                 stackPointer++;
-                stack[stackPointer].type = TAG_INT;
-                stack[stackPointer].data.i = a - b;
+                Variant* r = &stack[stackPointer];
+                if(isFloatVariant(&a, &b)) {
+                    r->type = TAG_FLOAT;
+                    r->data.f = getNumeric(&a) - getNumeric(&b);
+                } else {
+                    r->type = TAG_INT;
+                    r->data.i = a.data.i - b.data.i;
+                }
                 break;
             }
-            case 0xA2: {
-                int32_t b = stack[stackPointer].data.i; stackPointer--;
-                int32_t a = stack[stackPointer].data.i; stackPointer--;
+            case 0xA2: { // MUL
+                Variant b = stack[stackPointer]; stackPointer--;
+                Variant a = stack[stackPointer]; stackPointer--;
                 stackPointer++;
-                stack[stackPointer].type = TAG_INT;
-                stack[stackPointer].data.i = a * b;
+                Variant* r = &stack[stackPointer];
+                if(isFloatVariant(&a, &b)) {
+                    r->type = TAG_FLOAT;
+                    r->data.f = getNumeric(&a) * getNumeric(&b);
+                } else {
+                    r->type = TAG_INT;
+                    r->data.i = a.data.i * b.data.i;
+                }
                 break;
             }
-            case 0xA3: {
-                int32_t b = stack[stackPointer].data.i; stackPointer--;
-                int32_t a = stack[stackPointer].data.i; stackPointer--;
+            case 0xA3: { // DIV
+                Variant b = stack[stackPointer]; stackPointer--;
+                Variant a = stack[stackPointer]; stackPointer--;
                 stackPointer++;
-                stack[stackPointer].type = TAG_INT;
-                stack[stackPointer].data.i = a / b;
+                Variant* r = &stack[stackPointer];
+                r->type = TAG_FLOAT;
+                r->data.f = getNumeric(&a) / getNumeric(&b);
                 break;
             }
-            case 0xA4: {
-                int32_t b = stack[stackPointer].data.i; stackPointer--;
-                int32_t a = stack[stackPointer].data.i; stackPointer--;
+            case 0xA4: { // POW
+                Variant b = stack[stackPointer]; stackPointer--;
+                Variant a = stack[stackPointer]; stackPointer--;
                 stackPointer++;
-                stack[stackPointer].type = TAG_INT;
-                stack[stackPointer].data.i = (int32_t)pow((double)a, (double)b);
+                Variant* r = &stack[stackPointer];
+                if(isFloatVariant(&a, &b)) {
+                    r->type = TAG_FLOAT;
+                    r->data.f = pow(getNumeric(&a), getNumeric(&b));
+                } else {
+                    r->type = TAG_INT;
+                    r->data.i = (int32_t)pow(getNumeric(&a), getNumeric(&b));
+                }
                 break;
             }
-            case 0xA5: {
-                int32_t b = stack[stackPointer].data.i; stackPointer--;
-                int32_t a = stack[stackPointer].data.i; stackPointer--;
+            case 0xA5: { // MOD
+                Variant b = stack[stackPointer]; stackPointer--;
+                Variant a = stack[stackPointer]; stackPointer--;
                 stackPointer++;
-                stack[stackPointer].type = TAG_INT;
-                stack[stackPointer].data.i = a % b;
+                Variant* r = &stack[stackPointer];
+                if(isFloatVariant(&a, &b)) {
+                    r->type = TAG_FLOAT;
+                    r->data.f = fmod(getNumeric(&a), getNumeric(&b));
+                } else {
+                    r->type = TAG_INT;
+                    r->data.i = a.data.i % b.data.i;
+                }
                 break;
             }
             case 0xB0:
@@ -510,17 +638,20 @@ int execute(
             case 0xB3:
             case 0xB4:
             case 0xB5: {
-                int32_t b = stack[stackPointer].data.i; stackPointer--;
-                int32_t a = stack[stackPointer].data.i; stackPointer--;
+                Variant b = stack[stackPointer]; stackPointer--;
+                Variant a = stack[stackPointer]; stackPointer--;
                 int falseIndex = bytecode[PC + 1];
+
+                double av = getNumeric(&a);
+                double bv = getNumeric(&b);
                 int result = 0;
                 switch(opcode) {
-                    case 0xB0: result = a == b; break;
-                    case 0xB1: result = a >  b; break;
-                    case 0xB2: result = a <  b; break;
-                    case 0xB3: result = a >= b; break;
-                    case 0xB4: result = a <= b; break;
-                    case 0xB5: result = a != b; break;
+                    case 0xB0: result = av == bv; break;
+                    case 0xB1: result = av >  bv; break;
+                    case 0xB2: result = av <  bv; break;
+                    case 0xB3: result = av >= bv; break;
+                    case 0xB4: result = av <= bv; break;
+                    case 0xB5: result = av != bv; break;
                 }
                 if(!result) {
                     PC = falseIndex;

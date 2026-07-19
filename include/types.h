@@ -15,7 +15,7 @@ typedef struct {
 struct VMProgramData {
     std::vector<uint8_t> bytecode;
     std::vector<std::string> stringPool;
-    std::vector<int> constPool;
+    std::vector<double> constPool;
     int variableCount = 0;
 };
 

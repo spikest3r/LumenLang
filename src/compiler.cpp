@@ -30,7 +30,9 @@ std::unordered_map<std::string, int> funcList = {
     {"inputInt", 0x03},
     {"inputStr", 0x04},
     {"str2int", 0x05},
-    {"int2str", 0x06}
+    {"int2str", 0x06},
+    {"str2float", 0x07},
+    {"float2str", 0x08}
 };
 
 // 0xD0 - 0xFF is reserved for embedded functions
@@ -56,14 +58,17 @@ void pushToStack(std::string token, CompilerData* data) {
         data->bytecode.push_back(0x01); // operand type: string
         data->bytecode.push_back(static_cast<uint8_t>(strIndex));
     } else if (isPureNumber(token)) {
-        int x = std::stoi(token);
-        int idx = resolveConst(x, data);
-        data->bytecode.push_back(0x02); // operand type: int const
-        data->bytecode.push_back(static_cast<uint8_t>(idx)); // <-- use idx, not x
+        bool isFloat = isFloatLiteral(token);
+        TypeTag tag = isFloat ? TAG_FLOAT : TAG_INT;
+        uint8_t dataType = isFloat ? 0x05 : 0x02;
+        double x = std::stod(token);
+        int idx = resolveConst(x, tag, data);
+        data->bytecode.push_back(dataType);
+        data->bytecode.push_back(static_cast<uint8_t>(idx));
     } else {
         bool ref = token.starts_with("&");
         auto index = resolveVariableIndex(token, data);
-        data->bytecode.push_back(ref ? 0x04 : 0x03); // <-- use fresh opcodes, not reused 0x02/0x03
+        data->bytecode.push_back(ref ? 0x04 : 0x03);
         data->bytecode.push_back(static_cast<uint8_t>(index));
     }
 }
