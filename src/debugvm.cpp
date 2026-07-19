@@ -16,7 +16,7 @@ void step(
 void printHelp();
 bool askYesNo(const std::string& prompt, bool defaultVal = false);
 
-void zeroExecData(VMExecutionData* execData);
+void zeroExecData(VMExecutionData* execData, VMProgramData* progData);
 
 int run_debug(
     VMProgramData* progData
@@ -25,7 +25,6 @@ int run_debug(
 
     // vm
     VMExecutionData execData;
-    execData.variables.resize(progData->variableCount);
 
     // debugger
     std::unordered_set<int> breakpoints;
@@ -64,7 +63,7 @@ int run_debug(
 
             std::cout << "Executing..." << std::endl;
 
-            zeroExecData(&execData);
+            zeroExecData(&execData, progData);
 
             begin_execution(
                 progData, &execData, breakpoints
@@ -210,6 +209,12 @@ int run_debug(
                 debugRoutinesMap,
                 debugFuncListMap
             );
+        } else if(command == "quit" || command == "exit") {
+            bool confirm = true;
+            if(resume) {
+                confirm = askYesNo("Script is still running. Proceed?");
+            }
+            if(confirm) exit(0);
         }
         else {
             std::cout << "Unknown command" << std::endl;
@@ -286,7 +291,7 @@ bool askYesNo(const std::string& prompt, bool defaultVal) {
     }
 }
 
-void zeroExecData(VMExecutionData* execData) {
+void zeroExecData(VMExecutionData* execData, VMProgramData* progData) {
     execData->PC = 0;
     execData->halt = false;
 
@@ -294,7 +299,6 @@ void zeroExecData(VMExecutionData* execData) {
     execData->stack.clear();
     execData->pcStack.clear();
 
-    int oldSize = (int)execData->variables.size();
     execData->variables.clear();
-    execData->variables.resize(oldSize);
+    execData->variables.resize(progData->variableCount);
 }
