@@ -1,11 +1,20 @@
 #include "compiler.h"
 #include <charconv>
 
-static bool isNum(const std::string &s) {
-    if (s.empty()) return false;
-    float val;
-    auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), val);
-    return ec == std::errc() && ptr == s.data() + s.size();
+#include <cstdlib>
+#include <cerrno>
+
+static bool isNum(const std::string& s)
+{
+    if (s.empty())
+        return false;
+
+    char* end = nullptr;
+    errno = 0;
+
+    std::strtod(s.c_str(), &end);
+
+    return end == s.c_str() + s.size() && errno != ERANGE;
 }
 
 static bool isOp(char c) {
@@ -31,6 +40,13 @@ static std::vector<std::string> tokenize(const std::string &expr) {
 
         // unary minus: at start, after another operator, or after '('
         if (ch == '-' && (i == 0 || isOp(expr[i - 1]) || expr[i - 1] == '(')) {
+            buf += ch;
+            continue;
+        }
+
+        if ((ch == '+' || ch == '-') && !buf.empty() &&
+            (buf.back() == 'e' || buf.back() == 'E') &&
+            isNum(buf + "0")) { // buf+"0" e.g. "3e0" parses as a number => buf is a numeric prefix
             buf += ch;
             continue;
         }
@@ -92,16 +108,20 @@ static void evalRPN(const std::vector<std::string> &rpn, CompilerData* data) {
 
     for (const std::string &t : rpn) {
         if (isNum(t)) {
+            bool isFloat = isFloatLiteral(t);
+            TypeTag tag = isFloat ? TAG_FLOAT : TAG_INT;
+            uint8_t dataType = isFloat ? 0x05 : 0x02;
+            double constValue = std::stod(t);
+            int constIndex = resolveConst(constValue, tag, data);
+
             bytecode.push_back(0x03);
-            bytecode.push_back(0x02); // type 2 = int
-            int constValue = std::stoi(t);
-            int constIndex = resolveConst(constValue, data);
+            bytecode.push_back(dataType);
             bytecode.push_back(constIndex);
             stack.push_back(t);
         } else if (isVar(t)) {
             int varIndex = resolveVariableIndex(t, data);
             bytecode.push_back(0x03);
-            bytecode.push_back(0x03); // type 3 = variable
+            bytecode.push_back(0x03);
             bytecode.push_back(varIndex);
             stack.push_back(t);
         } else {
@@ -118,7 +138,7 @@ static void evalRPN(const std::vector<std::string> &rpn, CompilerData* data) {
                 case '%': bytecode.push_back(0xA5); break; // MOD
             }
 
-            stack.push_back(t); // result placeholder, consumed by later ops if chained
+            stack.push_back(t);
         }
     }
 }

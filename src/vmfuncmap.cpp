@@ -61,5 +61,38 @@ std::unordered_map<int, NativeFn> funcMap = {
         std::string str = std::to_string(num);
         variables[varIndex].type = TAG_STRING;
         variables[varIndex].data = str;
+    }},
+    {0x07, [](std::vector<Variant>& stack, std::vector<Variant>& variables) {
+        // str2float
+        auto varIndex = getInt(stack.back()); stack.pop_back();
+        auto value = stack.back(); stack.pop_back();
+
+        double num = 0.0;
+        std::string str = "0";
+        if(value.type == TAG_STRING) str = std::get<std::string>(value.data);
+
+        try {
+            num = std::stod(str);
+        } catch (const std::invalid_argument& e) {
+            num = 0.0;
+        } catch (const std::out_of_range& e) {
+            num = 0.0;
+        }
+
+        variables[varIndex].type = TAG_FLOAT;
+        variables[varIndex].data = num;
+    }},
+    {0x08, [](std::vector<Variant>& stack, std::vector<Variant>& variables) {
+        // float2str
+        auto varIndex = getInt(stack.back()); stack.pop_back();
+        auto value = stack.back(); stack.pop_back();
+
+        double num = 0.0;
+        if(value.type == TAG_FLOAT) num = std::get<double>(value.data);
+        else if(value.type == TAG_INT) num = static_cast<double>(getInt(value)); // accept int too, same leniency as int2str only handling its own type
+
+        std::string str = std::to_string(num);
+        variables[varIndex].type = TAG_STRING;
+        variables[varIndex].data = str;
     }}
 };

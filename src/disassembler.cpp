@@ -111,7 +111,7 @@ std::unordered_map<uint32_t, std::string> buildRoutineStarts(
     return routineStarts;
 }
 
-std::string disassemble(std::vector<uint8_t> bytecode, std::vector<std::string> stringPool, std::vector<int> constPool,
+std::string disassemble(std::vector<uint8_t> bytecode, std::vector<std::string> stringPool, std::vector<double> constPool,
     std::string debugFile, bool* debugSymbolsLoaded, int vmPC
 ) {
     int PC = 0;
@@ -199,13 +199,17 @@ std::string disassemble(std::vector<uint8_t> bytecode, std::vector<std::string> 
                             if(bytecode[PC + 1] == 0x01) {
                                 ss << " '" << stringPool[bytecode[PC + 2]] << "'";
                             } else if(hasDebugData) { 
-                                if(bytecode[PC + 1] == 0x02) {
-                                    ss << " " << std::dec << static_cast<int>(constPool[bytecode[PC + 2]]);
-                                } else if(bytecode[PC + 1] == 0x03) {
-                                    ss << " " << variables_debug[bytecode[PC + 2]];
+                                if(bytecode[PC + 1] == 0x03) {
+                                    std::cout << " " << variables_debug[bytecode[PC + 2]];
                                 }
                             } else {
-                                ss << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
+                                if(bytecode[PC + 1] == 0x02) {
+                                    std::cout << " " << std::dec << constPool[bytecode[PC + 2]];
+                                } else if(bytecode[PC + 1] == 0x05) {
+                                    std::cout << " " << std::dec << constPool[bytecode[PC + 2]];
+                                } else {
+                                    std::cout << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
+                                }
                             }
                         }
                         break;

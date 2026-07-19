@@ -41,7 +41,7 @@ Hello, Ryan!
 ### Language
 
 - Variables and dynamic values
-- Integer arithmetic
+- Integer and floating-point arithmetic
 - String manipulation
 - String concatenation with `..`
 - Conditional execution
@@ -164,6 +164,23 @@ result = number + 10
 println result
 ```
 
+Numbers can be integers or floats. A literal is treated as a float if it contains a decimal point or an exponent (`3.14`, `1e-2`); otherwise it's an integer:
+
+```lumen
+pi = 3.14159
+half = 1 / 2
+
+println pi
+println half
+```
+
+Mixing an int and a float in an expression promotes the result to a float:
+
+```lumen
+total = 10 + 2.5
+println total # 12.5
+```
+
 ### Strings
 
 Strings use single quotes:
@@ -248,6 +265,8 @@ call hello
 | `inputStr &variable` | Read string input |
 | `int2str in, &out` | Convert integer to string |
 | `str2int in, &out` | Convert string to integer |
+| `float2str in, &out` | Convert float to string |
+| `str2float in, &out` | Convert string to float |
 
 ## Operators
 
@@ -261,6 +280,8 @@ call hello
 %
 ^
 ```
+
+Arithmetic works across ints and floats. `/` always produces a float; the other operators return a float if either operand is a float, and an int otherwise.
 
 ### Comparison
 

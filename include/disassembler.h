@@ -10,7 +10,7 @@ struct RoutineInfo
 
 std::string disassemble(std::vector<uint8_t> bytecode, 
     std::vector<std::string> stringPool, 
-    std::vector<int> constPool,
+    std::vector<double> constPool,
     std::string debugFile = "", 
     bool* debugSymbolsLoaded = nullptr,
     int vmPC = -1
