@@ -138,3 +138,30 @@ bool isFloatLiteral(const std::string &s) {
            s.find('e') != std::string::npos ||
            s.find('E') != std::string::npos;
 }
+
+std::map<int, std::string> disassemblyMap = {
+    {0x01, "CALL"},
+    {0x02, "POP"},
+    {0x03, "PUSH"},
+    {0x04, "EXEC"},
+    {0x05, "JUMP"},
+    
+    {0xA0, "ADD"},
+    {0xA1, "SUB"},
+    {0xA2, "MUL"},
+    {0xA3, "DIV"},
+    {0xA4, "POW"},
+    {0xA5, "MOD"},
+    
+    {0xB0, "JEQ"},
+    {0xB1, "JGR"},
+    {0xB2, "JLS"},
+    {0xB3, "JGE"},
+    {0xB4, "JLE"},
+    {0xB5, "JNE"},
+
+    {0xAA, "JOIN"},
+
+    {0xFE, "RET"},
+    {0xFF, "HLT"}
+};
