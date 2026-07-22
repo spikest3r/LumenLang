@@ -1,0 +1,42 @@
+
+label loop
+call getTemp
+sleepMs 2250 # 3 seconds total
+jump loop
+
+
+routine getTemp
+
+oneWireReset 2 &present
+
+# Skip ROM
+oneWireWriteByte 2 204
+
+# Convert T
+oneWireWriteByte 2 68
+
+sleepMs 750
+
+oneWireReset 2 &present2
+
+# Skip ROM
+oneWireWriteByte 2 204
+
+# Read Scratchpad
+oneWireWriteByte 2 190
+
+oneWireReadByte 2 &tempLow
+oneWireReadByte 2 &tempHigh
+
+shiftLeft tempHigh 8 &high
+
+or tempLow high &raw
+
+temperature = raw / 16
+toPrint = ''
+float2str temperature &toPrint
+
+toPrint = 'Temperature: ' .. toPrint
+println toPrint
+
+endroutine

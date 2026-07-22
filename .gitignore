@@ -8,3 +8,4 @@ bin2h
 examples/*.dbg
 build
 test
+avr-vm/program.h

@@ -59,7 +59,13 @@ std::map<std::string, int> picoFuncList = {
     {"gpioGet", 0xD4},
     {"gpioPullUp", 0xD5},
     {"gpioPullDown", 0xD6},
-    {"sleepUs", 0xD7}
+    {"sleepUs", 0xD7},
+    {"oneWireReset", 0xD8},
+    {"oneWireWriteByte", 0xD9},
+    {"oneWireReadByte", 0xDA},
+    {"shiftLeft", 0xDB},
+{"shiftRight", 0xDC},
+{"or", 0xDD},
 };
 
 void printError(std::string error, int line) {
