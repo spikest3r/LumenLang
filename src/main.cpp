@@ -27,12 +27,12 @@ int main(int argc, char** argv) {
         file << "println greeting\n";
         file.close();
 
-        std::cout << "\n👋 Welcome to LumenLang!\n";
+        std::cout << "\nWelcome to LumenLang!\n";
         std::cout << "--------------------------------------------------\n";
-        std::cout << "✨ A starter script 'helloworld.lmn' was created for you.\n";
-        std::cout << "   This script will say hello and ask for your name.\n\n";
+        std::cout << "A starter script 'helloworld.lmn' was created for you.\n";
+        std::cout << "  This script will say hello and ask for your name.\n\n";
         std::cout << "Ready to try it out? Run this command:\n";
-        std::cout << "👉  lumen helloworld.lmn\n\n";
+        std::cout << "  lumen helloworld.lmn\n\n";
         std::cout << "Want more examples? Try running 'lumen --examples'.\n";
         std::cout << "For docs, visit: https://lumen.olehsheremeta.com/\n";
         return 0;
@@ -63,8 +63,8 @@ int main(int argc, char** argv) {
                 std::ofstream file(name);
                 file << code.c_str();
                 file.close();
-                std::cout << "✨ Created '" << name << "'!\n";
-                std::cout << "👉 Run it with: lumen " << name << "\n";
+                std::cout << "Created '" << name << "'!\n";
+                std::cout << "Run it with: lumen " << name << "\n";
                 return 0;
             } else {
                 std::cerr << "Unknown example" << std::endl;

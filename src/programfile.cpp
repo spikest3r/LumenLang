@@ -4,7 +4,7 @@ bool BinaryProgram::save(const std::string& path) {
     std::ofstream out(path, std::ios::binary);
     if (!out) return false;
 
-    unsigned char sig[2] = {0xFE, 0xFC};
+    unsigned char sig[2] = {0xFE, 0xFD};
     out.write(reinterpret_cast<char*>(sig), 2);
 
     // bytecode
@@ -44,11 +44,13 @@ bool BinaryProgram::load(const std::string& path) {
     // FE FA (v1)
     // FE FB (v2) - constPool of int
     // FE FC (v2.1) - constPool of double
+    // FE FD (v2.2) - 32-bit addressing
 
     bool isV2 = (sig[0] == 0xFE && sig[1] == 0xFB);
     bool isV3 = (sig[0] == 0xFE && sig[1] == 0xFC);
+    bool isV4 = (sig[0] == 0xFE && sig[1] == 0xFD);
 
-    if (!isV2 && !isV3) {
+    if (!isV2 && !isV3 && !isV4) {
         std::cerr << "Invalid signature\n";
         if (sig[0] == 0xFE && sig[1] == 0xFA) {
             std::cout << "v1 Precompiled Lumen binaries are not compatible with v2+ Lumen runtime" << std::endl;
@@ -84,7 +86,7 @@ bool BinaryProgram::load(const std::string& path) {
     int cpSize = 0;
     in.read(reinterpret_cast<char*>(&cpSize), sizeof(int));
 
-    if (isV3) {
+    if (isV3 || isV4) {
         constPool.resize(cpSize);
         in.read(reinterpret_cast<char*>(constPool.data()), cpSize * sizeof(double));
     } else {

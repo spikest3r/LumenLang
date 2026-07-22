@@ -120,10 +120,12 @@ int loadFromFlash(const uint8_t* data, int dataSize) {
     // FE FA (v1) - not supported
     // FE FB (v2) - constPool of int32
     // FE FC (v3) - constPool of double
+    // FE FD (v4) - 32-bit jump/call/comparison addressing
     int isV2 = (sig0 == 0xFE && sig1 == 0xFB);
     int isV3 = (sig0 == 0xFE && sig1 == 0xFC);
+    int isV4 = (sig0 == 0xFE && sig1 == 0xFD);
 
-    if (!isV2 && !isV3) {
+    if (!isV2 && !isV3 && !isV4) {
         send_uart("Invalid signature\n");
         if (sig0 == 0xFE && sig1 == 0xFA) {
             send_uart("v1 Precompiled Lumen binaries are not compatible with v2+ Lumen runtime\n");
@@ -160,7 +162,7 @@ int loadFromFlash(const uint8_t* data, int dataSize) {
     // const pool
     int cpSize = readInt(data, &pos);
     g_constPoolSize = cpSize;
-    if (isV3) {
+    if (isV3 || isV4) {
         for (int i = 0; i < cpSize; i++) {
             g_constPool[i] = readDouble(data, &pos);
         }
@@ -177,20 +179,27 @@ int loadFromFlash(const uint8_t* data, int dataSize) {
     return 0;
 }
 
+static uint32_t readU32FromBytecode(const uint8_t* bytecode, int pos) {
+    return (uint32_t)bytecode[pos]           |
+           (uint32_t)bytecode[pos + 1] << 8  |
+           (uint32_t)bytecode[pos + 2] << 16 |
+           (uint32_t)bytecode[pos + 3] << 24;
+}
+
 int getOpCodeOffset(int opcode) {
     switch(opcode) {
         case 0x03:
             return 3;
         case 0x04:
         case 0x02:
-        case 0xB0: // ==
-        case 0xB1: // >
-        case 0xB2: // <
-        case 0xB3: // >=
-        case 0xB4: // <=
-        case 0xB5: // != 
-        case 0x05:
-        case 0x01:
+        case 0xB0: // JEQ  (legacy 8-bit)
+        case 0xB1: // JGR  (legacy 8-bit)
+        case 0xB2: // JLS  (legacy 8-bit)
+        case 0xB3: // JGE  (legacy 8-bit)
+        case 0xB4: // JLE  (legacy 8-bit)
+        case 0xB5: // JNE  (legacy 8-bit)
+        case 0x05: // JUMP (legacy 8-bit)
+        case 0x01: // CALL (legacy 8-bit)
             return 2;
         case 0xFF:
         case 0xA0:
@@ -202,6 +211,15 @@ int getOpCodeOffset(int opcode) {
         case 0xAA:
         case 0xFE:
             return 1;
+        case 0x06: // JUMP32
+        case 0x07: // CALL32
+        case 0xC0: // JEQ32
+        case 0xC1: // JGR32
+        case 0xC2: // JLS32
+        case 0xC3: // JGE32
+        case 0xC4: // JLE32
+        case 0xC5: // JNE32
+            return 5;
     }
     return 0;
 }
@@ -228,18 +246,16 @@ void fn_inputInt(Variant stack[16], Variant variables[16], int* sp) {
     char buffer[32];
     uart_readline(buffer, sizeof(buffer));
 
-    int32_t value = 0;
-
     char* end;
-    value = strtoll(buffer, &end, 10);
+    double value = strtod(buffer, &end);
 
-    if(*end != '\0') {
+    if (*end != '\0') {
         send_uart("Invalid value!\n");
         value = 0;
     }
 
     variables[varRef->data.i].type = TAG_INT;
-    variables[varRef->data.i].data.i = value;
+    variables[varRef->data.i].data.i = (int32_t)value;
 }
 
 void fn_inputStr(Variant stack[16], Variant variables[16], int* sp) {
@@ -553,6 +569,17 @@ int execute(
                 PC = bytecode[PC + 1];
                 continue;
             }
+            case 0x06: { // JUMP32
+                uint32_t addr = readU32FromBytecode(bytecode, PC + 1);
+                PC = (int)addr;
+                continue;
+            }
+            case 0x07: { // CALL32
+                uint32_t addr = readU32FromBytecode(bytecode, PC + 1);
+                pcStack[++pcStackPointer] = PC + offset;
+                PC = (int)addr;
+                continue;
+            }
             case 0xA0: { // ADD
                 Variant b = stack[stackPointer]; stackPointer--;
                 Variant a = stack[stackPointer]; stackPointer--;
@@ -655,6 +682,33 @@ int execute(
                 }
                 if(!result) {
                     PC = falseIndex;
+                    continue;
+                }
+                break;
+            }
+            case 0xC0:
+            case 0xC1:
+            case 0xC2:
+            case 0xC3:
+            case 0xC4:
+            case 0xC5: {
+                Variant b = stack[stackPointer]; stackPointer--;
+                Variant a = stack[stackPointer]; stackPointer--;
+                uint32_t falseIndex = readU32FromBytecode(bytecode, PC + 1);
+
+                double av = getNumeric(&a);
+                double bv = getNumeric(&b);
+                int result = 0;
+                switch(opcode) {
+                    case 0xC0: result = av == bv; break;
+                    case 0xC1: result = av >  bv; break;
+                    case 0xC2: result = av <  bv; break;
+                    case 0xC3: result = av >= bv; break;
+                    case 0xC4: result = av <= bv; break;
+                    case 0xC5: result = av != bv; break;
+                }
+                if(!result) {
+                    PC = (int)falseIndex;
                     continue;
                 }
                 break;
