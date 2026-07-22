@@ -58,7 +58,8 @@ std::map<std::string, int> picoFuncList = {
     {"sleepMs", 0xD3},
     {"gpioGet", 0xD4},
     {"gpioPullUp", 0xD5},
-    {"gpioPullDown", 0xD6}
+    {"gpioPullDown", 0xD6},
+    {"sleepUs", 0xD7}
 };
 
 void printError(std::string error, int line) {
