@@ -1,4 +1,7 @@
 #include "disassembler.h"
+#include <iostream>
+#include <iomanip>
+#include <sstream>
 
 std::map<int, std::string> disassemblyMap = {
     {0x01, "CALL"},
@@ -6,14 +9,17 @@ std::map<int, std::string> disassemblyMap = {
     {0x03, "PUSH"},
     {0x04, "EXEC"},
     {0x05, "JUMP"},
-    
+    {0x06, "JUMP32"},
+    {0x07, "CALL32"},
+
     {0xA0, "ADD"},
     {0xA1, "SUB"},
     {0xA2, "MUL"},
     {0xA3, "DIV"},
     {0xA4, "POW"},
     {0xA5, "MOD"},
-    
+
+    // 8-bit / Standard Branches
     {0xB0, "JEQ"},
     {0xB1, "JGR"},
     {0xB2, "JLS"},
@@ -21,8 +27,15 @@ std::map<int, std::string> disassemblyMap = {
     {0xB4, "JLE"},
     {0xB5, "JNE"},
 
-    {0xAA, "JOIN"},
+    // 32-bit Branches
+    {0xC0, "JEQ32"},
+    {0xC1, "JGR32"},
+    {0xC2, "JLS32"},
+    {0xC3, "JGE32"},
+    {0xC4, "JLE32"},
+    {0xC5, "JNE32"},
 
+    {0xAA, "JOIN"},
     {0xFE, "RET"},
     {0xFF, "HLT"}
 };
@@ -41,59 +54,49 @@ bool loadDebugInfo(const std::string& fileName,
 
     std::string line;
 
-    // Variables
-    std::getline(file, line); // "variables"
+    // Variables Section
+    if (std::getline(file, line) && line.rfind("variables", 0) == 0) {
+        while (std::getline(file, line)) {
+            if (line == "routines") break;
+            if (line.empty()) continue;
 
-    while (std::getline(file, line))
-    {
-        if (line == "routines")
-            break;
-
-        std::string name;
-        int index;
-
-        std::stringstream ss(line);
-        ss >> name >> index;
-
-        variables[index] = name;
+            std::string name;
+            int index;
+            std::stringstream ss(line);
+            if (ss >> name >> index) {
+                variables[index] = name;
+            }
+        }
     }
 
-    // Routines
-    while (std::getline(file, line))
-    {
-        if (line == "exec")
-            break;
+    // Routines Section
+    while (std::getline(file, line)) {
+        if (line == "exec") break;
+        if (line.empty()) continue;
 
         std::string name = line;
+        std::string offsetLine, lengthLine;
 
-        std::string offsetLine;
-        std::string lengthLine;
-
-        if (!std::getline(file, offsetLine))
-            break;
-        if (!std::getline(file, lengthLine))
+        if (!std::getline(file, offsetLine) || !std::getline(file, lengthLine))
             break;
 
         RoutineInfo info;
         info.offset = std::stoul(offsetLine);
         info.length = std::stoul(lengthLine);
-
         routines[name] = info;
     }
 
-    // Exec functions
-    while (std::getline(file, line))
-    {
+    // Exec Functions Section
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
         std::string name;
         int index;
 
         std::stringstream ss(line);
-        ss >> name >> index;
-
-        funcList[index] = name;
+        if (ss >> name >> index) {
+            funcList[index] = name;
+        }
     }
-
-    std::cout << "Debug info loaded from " << fileName << std::endl;
 
     return true;
 }
@@ -102,18 +105,19 @@ std::unordered_map<uint32_t, std::string> buildRoutineStarts(
     const std::unordered_map<std::string, RoutineInfo>& routines)
 {
     std::unordered_map<uint32_t, std::string> routineStarts;
-
-    for (const auto& [name, info] : routines)
-    {
+    for (const auto& [name, info] : routines) {
         routineStarts[info.offset] = name;
     }
-
     return routineStarts;
 }
 
-std::string disassemble(std::vector<uint8_t> bytecode, std::vector<std::string> stringPool, std::vector<double> constPool,
-    std::string debugFile, bool* debugSymbolsLoaded, int vmPC
-) {
+std::string disassemble(std::vector<uint8_t> bytecode,
+    std::vector<std::string> stringPool,
+    std::vector<double> constPool,
+    std::string debugFile,
+    bool* debugSymbolsLoaded,
+    int vmPC)
+{
     int PC = 0;
     int size = bytecode.size();
 
@@ -125,119 +129,181 @@ std::string disassemble(std::vector<uint8_t> bytecode, std::vector<std::string> 
     std::unordered_map<uint32_t, std::string> routineStarts;
     bool hasDebugData = false;
 
-    if(debugFile != "") {
-        std::cout << "Loading debug info from " << debugFile << std::endl;
+    if (!debugFile.empty()) {
+        ss << "Loading debug info from " << debugFile << std::endl;
         bool success = loadDebugInfo(debugFile, variables_debug, routines_debug, funcList_debug);
-        if(success) {
+        if (success) {
             routineStarts = buildRoutineStarts(routines_debug);
             hasDebugData = true;
-            if(debugSymbolsLoaded) *debugSymbolsLoaded = true;
-        } else {
-            if(debugSymbolsLoaded) *debugSymbolsLoaded = false;
+            if (debugSymbolsLoaded) *debugSymbolsLoaded = true;
+        }
+        else {
+            if (debugSymbolsLoaded) *debugSymbolsLoaded = false;
         }
     }
 
-    bool pointMode = vmPC != -1;
+    bool pointMode = (vmPC != -1);
 
     ss << "===== Main =====" << std::endl;
-    
-    while(PC < size) {
-        auto offset = getOpCodeOffset(bytecode[PC]);
 
-        if(pointMode) {
-            if (vmPC == PC) {
-                ss << "PC -> ";
-            } else {
-                ss << "      ";
+    while (PC < size) {
+        if (hasDebugData) {
+            auto it = routineStarts.find(PC);
+            if (it != routineStarts.end()) {
+                ss << "\n===== Routine " << it->second << " =====\n";
             }
+        }
+
+        uint8_t byte = bytecode[PC];
+        int offset = getOpCodeOffset(byte);
+
+        if (offset <= 0) {
+            offset = 1;
+        }
+
+        if (PC + offset > size) {
+            ss << "Error: Truncated bytecode instruction at offset 0x"
+                << std::hex << PC << std::dec << std::endl;
+            break;
+        }
+
+        if (pointMode) {
+            ss << (vmPC == PC ? "PC -> " : "      ");
         }
 
         ss << "0x" << std::hex << std::right << std::setw(8) << std::setfill('0') << PC << ": ";
 
         std::stringstream hex_stream;
-        for(int i = PC; i < PC + offset; i++) {
+        for (int i = PC; i < PC + offset; i++) {
             hex_stream << std::hex << std::setw(2) << std::setfill('0')
-                    << static_cast<int>(bytecode[i]) << " ";
+                << static_cast<int>(bytecode[i]) << " ";
         }
 
         ss << std::setfill(' ') << std::left << std::setw(15) << hex_stream.str() << " | ";
 
-        ss << std::dec;
+        std::string op = "UNKNOWN";
+        if (disassemblyMap.count(byte)) {
+            op = disassemblyMap[byte];
+        }
+        ss << std::dec << op;
 
-        auto byte = bytecode[PC];
-        auto op = disassemblyMap[byte];
-        ss << op;
-
-        int j = 0;
-        for(int i = PC + 1; i < PC + offset; i++) {
-            if(!op.empty() && op[0] == 'J') {
-                ss << " 0x" 
-                        << std::hex << std::right << std::setw(8) << std::setfill('0')
-                        << static_cast<int>(bytecode[i]);
-                
-                ss << std::dec << std::setfill(' ') << std::left; 
-            } else {
-                switch(byte) {
-                    case 0x01: // CALL
-                        {
-                            if(hasDebugData) {
-                                auto rt = routineStarts[bytecode[PC + 1] - 1];
-                                ss << " " << rt << " (0x" 
-                                        << std::hex << std::right << std::setw(8) << std::setfill('0')
-                                        << static_cast<int>(bytecode[i]) << ")";
-                            } else {
-                                ss << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
-                            }
-                        }
-                        break;
-                    case 0x02: // POP
-                        if(hasDebugData) ss << " " << variables_debug[bytecode[PC + 1]];
-                        else ss << " " << std::dec << static_cast<int>(bytecode[PC + 1]);
-                        break;
-                    case 0x03: // PUSH
-                        if(j < 1) {
-                            if(bytecode[PC + 1] == 0x01) {
-                                ss << " '" << stringPool[bytecode[PC + 2]] << "'";
-                            } else if(hasDebugData) { 
-                                if(bytecode[PC + 1] == 0x03) {
-                                    std::cout << " " << variables_debug[bytecode[PC + 2]];
-                                }
-                            } else {
-                                if(bytecode[PC + 1] == 0x02) {
-                                    std::cout << " " << std::dec << constPool[bytecode[PC + 2]];
-                                } else if(bytecode[PC + 1] == 0x05) {
-                                    std::cout << " " << std::dec << constPool[bytecode[PC + 2]];
-                                } else {
-                                    std::cout << " " << std::dec << static_cast<int>(bytecode[PC + 2]);
-                                }
-                            }
-                        }
-                        break;
-                    case 0x04: // EXEC
-                        {
-                            if(hasDebugData) ss << " " << funcList_debug[bytecode[PC + 1]];
-                            else ss << " " << std::dec << static_cast<int>(bytecode[PC + 1]);
-                        }
-                        break;
-                    default:
-                        ss << " " << std::dec << static_cast<int>(bytecode[i]);
-                        break;
+        switch (byte) {
+        case 0x01: // CALL (16-bit / 8-bit Target)
+            if (offset > 1) {
+                uint8_t targetIndex = bytecode[PC + 1];
+                if (hasDebugData && routineStarts.count(targetIndex)) {
+                    ss << " " << routineStarts[targetIndex] << " (0x"
+                        << std::hex << static_cast<int>(targetIndex) << std::dec << ")";
+                }
+                else {
+                    ss << " " << static_cast<int>(targetIndex);
                 }
             }
-            j++;
-        }
+            break;
 
-        ss << std::endl;
-
-        if(hasDebugData) {
-            auto it = routineStarts.find(PC);
-            if (it != routineStarts.end())
-            {
-                ss << "\n===== Routine " << it->second << " =====\n";
+        case 0x02: // POP / STORE
+            if (offset > 1) {
+                uint8_t varIdx = bytecode[PC + 1];
+                if (hasDebugData && variables_debug.count(varIdx)) {
+                    ss << " " << variables_debug[varIdx];
+                }
+                else {
+                    ss << " var[" << static_cast<int>(varIdx) << "]";
+                }
             }
+            break;
+
+        case 0x03: // PUSH <Type> <Value/Index>
+            if (offset >= 3) {
+                uint8_t pushType = bytecode[PC + 1];
+                uint8_t operand = bytecode[PC + 2];
+
+                if (pushType == 0x01) { // String Literal
+                    if (operand < stringPool.size()) {
+                        ss << " '" << stringPool[operand] << "'";
+                    }
+                    else {
+                        ss << " str[" << static_cast<int>(operand) << "]";
+                    }
+                }
+                else if (pushType == 0x02 || pushType == 0x05) { // Numeric / Constant Pool
+                    if (operand < constPool.size()) {
+                        ss << " " << constPool[operand];
+                    }
+                    else {
+                        ss << " const[" << static_cast<int>(operand) << "]";
+                    }
+                }
+                else if (pushType == 0x03) { // Variable Value
+                    if (hasDebugData && variables_debug.count(operand)) {
+                        ss << " " << variables_debug[operand];
+                    }
+                    else {
+                        ss << " var[" << static_cast<int>(operand) << "]";
+                    }
+                }
+                else { // Raw Immediate Integer
+                    ss << " " << static_cast<int>(operand);
+                }
+            }
+            break;
+
+        case 0x04: // EXEC (Built-in standard library function)
+            if (offset > 1) {
+                uint8_t funcIdx = bytecode[PC + 1];
+                if (hasDebugData && funcList_debug.count(funcIdx)) {
+                    ss << " " << funcList_debug[funcIdx];
+                }
+                else {
+                    ss << " fn[" << static_cast<int>(funcIdx) << "]";
+                }
+            }
+            break;
+
+            // 8-bit Jumps / Branches
+        case 0x05: // JUMP
+        case 0xB0: // JEQ
+        case 0xB1: // JGR
+        case 0xB2: // JLS
+        case 0xB3: // JGE
+        case 0xB4: // JLE
+        case 0xB5: // JNE
+            if (offset > 1) {
+                uint32_t targetAddr = bytecode[PC + 1];
+                ss << " 0x" << std::hex << std::right
+                    << std::setw(8) << std::setfill('0') << targetAddr;
+            }
+            break;
+
+            // 32-bit Jumps, Calls, and Branches
+        case 0x06: // JUMP32
+        case 0x07: // CALL32
+        case 0xC0: // JEQ32
+        case 0xC1: // JGR32
+        case 0xC2: // JLS32
+        case 0xC3: // JGE32
+        case 0xC4: // JLE32
+        case 0xC5: // JNE32
+            if (offset == 5) {
+                uint32_t targetAddr = bytecode[PC + 1] |
+                    (bytecode[PC + 2] << 8) |
+                    (bytecode[PC + 3] << 16) |
+                    (bytecode[PC + 4] << 24);
+                ss << " 0x" << std::hex << std::right
+                    << std::setw(8) << std::setfill('0') << targetAddr;
+            }
+            break;
+
+        default:
+            // Fallback for generic instructions
+            for (int i = PC + 1; i < PC + offset; i++) {
+                ss << " " << static_cast<int>(bytecode[i]);
+            }
+            break;
         }
-        
-        PC += offset;
+
+        ss << std::dec << std::endl;
+        PC += offset; // Guaranteed to increment PC!
     }
 
     ss << std::dec << std::endl;

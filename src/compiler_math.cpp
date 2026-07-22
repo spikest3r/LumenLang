@@ -101,10 +101,8 @@ static std::vector<std::string> shuntingYard(const std::vector<std::string> &tok
     return out;
 }
 
-static void evalRPN(const std::vector<std::string> &rpn, CompilerData* data) {
+static void evalRPN(const std::vector<std::string> &rpn, CompilerData* data, std::vector<uint8_t>& bytecode) {
     std::vector<std::string> stack;
-
-    auto& bytecode = data->bytecode;
 
     for (const std::string &t : rpn) {
         if (isNum(t)) {
@@ -143,8 +141,8 @@ static void evalRPN(const std::vector<std::string> &rpn, CompilerData* data) {
     }
 }
 
-void compileExpression(std::string expr, CompilerData* data) {
+void compileExpression(std::string expr, CompilerData* data, std::vector<uint8_t>& bytecode) {
     auto tokens = tokenize(expr);
     auto rpn    = shuntingYard(tokens);
-    return evalRPN(rpn, data);
+    return evalRPN(rpn, data, bytecode);
 }

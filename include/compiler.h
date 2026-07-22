@@ -10,5 +10,5 @@ int compile(const std::string& script,
 );
 
 void compileExpression(
-    std::string expr, CompilerData* data
+    std::string expr, CompilerData* data, std::vector<uint8_t>& bytecode
 );
