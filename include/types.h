@@ -19,12 +19,19 @@ struct VMProgramData {
     int variableCount = 0;
 };
 
+struct CallFrame {
+    int returnPC;
+    int routineBase;
+};
+
 struct VMExecutionData {
     std::vector<Variant> variables;
     std::vector<Variant> stack;
-    std::vector<int> pcStack;
+    std::vector<CallFrame> pcStack;
+
     int PC = 0;
-    bool halt = 0;
+    int routineBase = 0;
+    bool halt = false;
 };
 
 typedef enum {

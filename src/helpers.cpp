@@ -79,34 +79,48 @@ int resolveConst(double constValue, TypeTag type, CompilerData* data) {
 }
 
 int getOpCodeOffset(int opcode) {
-    switch(opcode) {
-        // case 0x01:
-        //     return 4;
-        case 0x03:
-            return 3;
-        case 0x04:
-        case 0x02:
-        case 0xB0: // ==
-        case 0xB1: // >
-        case 0xB2: // <
-        case 0xB3: // >=
-        case 0xB4: // <=
-        case 0xB5: // != 
-        case 0x05:
-        case 0x01:
-            return 2;
-        case 0xFF:
-        case 0xA0:
-        case 0xA1:
-        case 0xA2:
-        case 0xA3:
-        case 0xA4:
-        case 0xA5:
-        case 0xAA:
-        case 0xFE:
-            return 1;
+    switch (opcode) {
+    case 0x03: // PUSH
+        return 3;
+
+    case 0x01: // CALL (16-bit/8-bit relative)
+    case 0x02: // POP
+    case 0x04: // EXEC
+    case 0x05: // JUMP (8-bit)
+    case 0xB0: // JEQ
+    case 0xB1: // JGR
+    case 0xB2: // JLS
+    case 0xB3: // JGE
+    case 0xB4: // JLE
+    case 0xB5: // JNE
+        return 2;
+
+    case 0xAA: // JOIN
+    case 0xA0: // ADD
+    case 0xA1: // SUB
+    case 0xA2: // MUL
+    case 0xA3: // DIV
+    case 0xA4: // POW
+    case 0xA5: // MOD
+    case 0xFE: // RET
+    case 0xFF: // HLT
+        return 1;
+
+        // 32-bit offset instructions (1 byte opcode + 4 bytes address/offset)
+    case 0x06: // JUMP32
+    case 0x07: // CALL32
+    case 0xC0: // JEQ32
+    case 0xC1: // JGR32
+    case 0xC2: // JLS32
+    case 0xC3: // JGE32
+    case 0xC4: // JLE32
+    case 0xC5: // JNE32
+        return 5;
+
+    default:
+        // Fallback for unknown opcodes or 0x00 padding bytes
+        return 1;
     }
-    return 0;
 }
 
 bool isVar(const std::string &s) {
@@ -145,14 +159,17 @@ std::map<int, std::string> disassemblyMap = {
     {0x03, "PUSH"},
     {0x04, "EXEC"},
     {0x05, "JUMP"},
-    
+    {0x06, "JUMP32"},
+    {0x07, "CALL32"},
+
     {0xA0, "ADD"},
     {0xA1, "SUB"},
     {0xA2, "MUL"},
     {0xA3, "DIV"},
     {0xA4, "POW"},
     {0xA5, "MOD"},
-    
+
+    // 8-bit / Standard Branches
     {0xB0, "JEQ"},
     {0xB1, "JGR"},
     {0xB2, "JLS"},
@@ -160,8 +177,15 @@ std::map<int, std::string> disassemblyMap = {
     {0xB4, "JLE"},
     {0xB5, "JNE"},
 
-    {0xAA, "JOIN"},
+    // 32-bit Branches
+    {0xC0, "JEQ32"},
+    {0xC1, "JGR32"},
+    {0xC2, "JLS32"},
+    {0xC3, "JGE32"},
+    {0xC4, "JLE32"},
+    {0xC5, "JNE32"},
 
+    {0xAA, "JOIN"},
     {0xFE, "RET"},
     {0xFF, "HLT"}
 };
