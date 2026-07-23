@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Lumen Playground</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 <style>
   * { box-sizing: border-box; }
 
@@ -181,6 +182,8 @@
       <div class="menu-sep"></div>
       <div class="menu-item" id="m-saveLmn">Save LMN</div>
       <div class="menu-item" id="m-saveBin">Save BIN</div>
+      <div class="menu-sep"></div>
+      <div class="menu-item" id="m-genQr">Generate binary QR</div>
     </div>
   </div>
   <div class="menu" id="examplesMenu">
@@ -217,6 +220,7 @@
 
 <script type="module">
   import createModule from './lumen.js';
+  import { exportLmnbinQR } from './qr.js';
 
   const editor         = document.getElementById('editor');
   const consoleEl       = document.getElementById('console');
@@ -236,6 +240,7 @@
   const mOpenBin        = document.getElementById('m-openBin');
   const mSaveLmn        = document.getElementById('m-saveLmn');
   const mSaveBin        = document.getElementById('m-saveBin');
+  const mGenQr          = document.getElementById('m-genQr');
 
   const fileMenu        = document.getElementById('fileMenu');
   const examplesMenu    = document.getElementById('examplesMenu');
@@ -406,6 +411,25 @@
       writeLine('failed to load ' + file.name, '#d97757');
     }
     e.target.value = '';
+  });
+
+  mGenQr.addEventListener('click', async () => {
+    const images = await exportLmnbinQR(
+          Module,
+          Module.wasmMemory
+      );
+
+    const container = document.getElementById("console");
+
+    for (const src of images)
+    {
+        const img = document.createElement("img");
+
+        img.src = src;
+        img.width = 512;
+
+        container.appendChild(img);
+    }
   });
 
   function baseName(name) {

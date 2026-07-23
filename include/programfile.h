@@ -10,6 +10,8 @@ public:
     int variableCount;
     bool save(const std::string& path);
     bool load(const std::string& path);
+
+    std::vector<uint8_t> saveStream();
 };
 
 void constructProgData(VMProgramData* progData, BinaryProgram* inProg);

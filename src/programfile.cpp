@@ -105,6 +105,86 @@ bool BinaryProgram::load(const std::string& path) {
     return true;
 }
 
+std::vector<uint8_t> BinaryProgram::saveStream()
+{
+    std::vector<uint8_t> out;
+
+    auto writeBytes = [&](const void* data, size_t size)
+    {
+        size_t old = out.size();
+
+        out.resize(old + size);
+
+        memcpy(
+            out.data() + old,
+            data,
+            size
+        );
+    };
+
+    // signature
+    uint8_t sig[2] = {0xFE, 0xFD};
+    writeBytes(sig, 2);
+
+    // bytecode
+    int bcSize = (int)bytecode.size();
+
+    writeBytes(
+        &bcSize,
+        sizeof(int)
+    );
+
+    writeBytes(
+        bytecode.data(),
+        bcSize * sizeof(uint8_t)
+    );
+
+    // string pool
+    int spSize = (int)stringPool.size();
+
+    writeBytes(
+        &spSize,
+        sizeof(int)
+    );
+
+    for (const auto& str : stringPool)
+    {
+        int len = (int)str.size();
+
+        writeBytes(
+            &len,
+            sizeof(int)
+        );
+
+        writeBytes(
+            str.data(),
+            len
+        );
+    }
+
+    // const pool
+    int cpSize = (int)constPool.size();
+
+    writeBytes(
+        &cpSize,
+        sizeof(int)
+    );
+
+    writeBytes(
+        constPool.data(),
+        cpSize * sizeof(double)
+    );
+
+    // variable count
+    writeBytes(
+        &variableCount,
+        sizeof(int)
+    );
+
+
+    return out;
+}
+
 void constructProgData(VMProgramData* progData, BinaryProgram* inProg) {
     progData->bytecode = inProg->bytecode;
     progData->stringPool = inProg->stringPool;

@@ -71,6 +71,24 @@ std::string getExample(const std::string& key) {
     }
 } 
 
+static std::vector<uint8_t> lmnbin;
+
+extern "C"
+{
+
+    uint8_t* getLmnbin() {
+        lmnbin = program.saveStream();
+        return lmnbin.data();
+    }
+
+
+    size_t getLmnbinSize()
+    {
+        return lmnbin.size();
+    }
+
+}
+
 EMSCRIPTEN_BINDINGS(module) {
     emscripten::function("loadProgram", &loadProgram);
     emscripten::function("saveProgram", &saveProgram);
