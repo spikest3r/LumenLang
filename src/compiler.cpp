@@ -518,9 +518,9 @@ int compile(const std::string& script,
                 auto& rMap = routineLabels[idx];
                 auto labelIt = rMap.find(jump.keyword);
                 if (labelIt != rMap.end()) {
-                    // Absolute address = base routine offset + relative location inside routine
-                    uint32_t absoluteTarget = static_cast<uint32_t>(routineOffsets[idx] + labelIt->second);
-                    patchUint32(subroutineBytecode[idx], jump.location, absoluteTarget);
+                    // relative offset within the routine — VM adds routineBase at runtime
+                    uint32_t relativeTarget = static_cast<uint32_t>(labelIt->second);
+                    patchUint32(subroutineBytecode[idx], jump.location, relativeTarget);
                 }
                 else {
                     printError("Label '" + jump.keyword + "' is not defined in routine scope", jump.line);
@@ -528,7 +528,6 @@ int compile(const std::string& script,
                 }
             }
         }
-
         // Merge routine bytecode into main global bytecode vector
         compilerData->bytecode.insert(compilerData->bytecode.end(), routineBc.begin(), routineBc.end());
     }

@@ -152,3 +152,40 @@ bool isFloatLiteral(const std::string &s) {
            s.find('e') != std::string::npos ||
            s.find('E') != std::string::npos;
 }
+
+std::map<int, std::string> disassemblyMap = {
+    {0x01, "CALL"},
+    {0x02, "POP"},
+    {0x03, "PUSH"},
+    {0x04, "EXEC"},
+    {0x05, "JUMP"},
+    {0x06, "JUMP32"},
+    {0x07, "CALL32"},
+
+    {0xA0, "ADD"},
+    {0xA1, "SUB"},
+    {0xA2, "MUL"},
+    {0xA3, "DIV"},
+    {0xA4, "POW"},
+    {0xA5, "MOD"},
+
+    // 8-bit / Standard Branches
+    {0xB0, "JEQ"},
+    {0xB1, "JGR"},
+    {0xB2, "JLS"},
+    {0xB3, "JGE"},
+    {0xB4, "JLE"},
+    {0xB5, "JNE"},
+
+    // 32-bit Branches
+    {0xC0, "JEQ32"},
+    {0xC1, "JGR32"},
+    {0xC2, "JLS32"},
+    {0xC3, "JGE32"},
+    {0xC4, "JLE32"},
+    {0xC5, "JNE32"},
+
+    {0xAA, "JOIN"},
+    {0xFE, "RET"},
+    {0xFF, "HLT"}
+};
