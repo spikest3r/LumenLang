@@ -258,22 +258,17 @@ void fn_inputInt(Variant stack[16], Variant variables[16], int* sp) {
     variables[varRef->data.i].data.i = (int32_t)value;
 }
 
+char buffer_inputStr[64];
+
 void fn_inputStr(Variant stack[16], Variant variables[16], int* sp) {
     Variant* varRef = &stack[*sp];
     (*sp)--;
 
-    char buffer[64];
-    uart_readline(buffer, sizeof(buffer));
-
-    char* str = malloc(strlen(buffer) + 1);
-
-    if(!str)
-        return;
-
-    strcpy(str, buffer);
+    memset(buffer_inputStr, 0, sizeof(buffer_int2str));
+    uart_readline(buffer_inputStr, sizeof(buffer_inputStr));
 
     variables[varRef->data.i].type = TAG_STRING;
-    variables[varRef->data.i].data.str = str;
+    variables[varRef->data.i].data.str = buffer_inputStr;
 }
 
 void fn_str2int(Variant stack[16], Variant variables[16], int* sp) {
@@ -300,6 +295,8 @@ void fn_str2int(Variant stack[16], Variant variables[16], int* sp) {
     variables[varRef->data.i].data.i = (int32_t)val;
 }
 
+char buffer_int2str[12];
+
 void fn_int2str(Variant stack[16], Variant variables[16], int* sp) {
     Variant* varRef = &stack[*sp];
     (*sp)--;
@@ -311,18 +308,11 @@ void fn_int2str(Variant stack[16], Variant variables[16], int* sp) {
 
     if(value->type == TAG_INT) integer = value->data.i;
 
-    char buf[12];
-    snprintf(buf, sizeof(buf), "%ld", (long)integer);
-
-    char* str = malloc(strlen(buf) + 1);
-
-    if(!str)
-        return;
-
-    strcpy(str, buf);
+    memset(buffer_int2str, 0, sizeof(buffer_int2str));
+    snprintf(buffer_int2str, sizeof(buffer_int2str), "%ld", (long)integer);
 
     variables[varRef->data.i].type = TAG_STRING;
-    variables[varRef->data.i].data.str = str;
+    variables[varRef->data.i].data.str = buffer_int2str;
 }
 
 void fn_str2float(Variant stack[16], Variant variables[16], int* sp) {
@@ -349,6 +339,8 @@ void fn_str2float(Variant stack[16], Variant variables[16], int* sp) {
     variables[varRef->data.i].data.f = val;
 }
 
+char buffer_float2str[32];
+
 void fn_float2str(Variant stack[16], Variant variables[16], int* sp) {
     Variant* varRef = &stack[*sp];
     (*sp)--;
@@ -360,18 +352,11 @@ void fn_float2str(Variant stack[16], Variant variables[16], int* sp) {
     if(value->type == TAG_FLOAT) num = value->data.f;
     else if(value->type == TAG_INT) num = (double)value->data.i;
 
-    char buf[32];
-    snprintf(buf, sizeof(buf), "%f", num);
-
-    char* str = malloc(strlen(buf) + 1);
-
-    if(!str)
-        return;
-
-    strcpy(str, buf);
+    memset(buffer_float2str, 0, sizeof(buffer_float2str));
+    snprintf(buffer_float2str, sizeof(buf), "%f", num);
 
     variables[varRef->data.i].type = TAG_STRING;
-    variables[varRef->data.i].data.str = str;
+    variables[varRef->data.i].data.str = buffer_float2str;
 }
 
 void fn_gpioInit(Variant stack[16], Variant variables[16], int* sp) {
@@ -457,6 +442,8 @@ NativeFn customFuncTable[] = {
 };
 
 #define CUSTOM_FUNC_COUNT (sizeof(customFuncTable) / sizeof(customFuncTable[0]))
+
+char joinBuffer[MAX_STRING_LEN];
 
 int execute(
     const uint8_t* bytecode,
@@ -721,10 +708,8 @@ int execute(
                     totalLen += strlen(stack[stackPointer - i].data.str);
                 }
 
-                char* result = malloc(totalLen + 1);
-                if(!result) return -1;
-
-                char *dst = result;
+                malloc(joinBuffer, 0, sizeof(joinBuffer));
+                char *dst = joinBuffer;
 
                 for(int i = strCount - 1; i >= 0; i--) {
                     char *src = stack[stackPointer-i].data.str;
