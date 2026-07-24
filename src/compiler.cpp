@@ -583,5 +583,7 @@ int compile(const std::string& script,
     //     }
     // }
 
+    compilerData->variableCount = compilerData->variableMap.size();
+
     return 0;
 }

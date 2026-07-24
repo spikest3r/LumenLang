@@ -416,7 +416,8 @@
   mGenQr.addEventListener('click', async () => {
     const images = await exportLmnbinQR(
           Module,
-          Module.wasmMemory
+          Module.wasmMemory,
+          currentFilename
       );
 
     const container = document.getElementById("console");

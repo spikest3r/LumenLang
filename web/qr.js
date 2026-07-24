@@ -52,6 +52,7 @@ function toBase64(bytes)
 export async function exportLmnbinQR(
     wasm,
     wasmMemory,
+    programName,
     chunkSize = 500
 )
 {
@@ -84,7 +85,7 @@ export async function exportLmnbinQR(
     {
         const payload =
         {
-            n: "lmnbin",
+            n: programName,
             i: i,
             t: chunks.length,
             sz: lmnbin.length,
