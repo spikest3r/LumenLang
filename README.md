@@ -256,6 +256,18 @@ call hello
 | `float2str in, &out` | Convert float to string |
 | `str2float in, &out` | Convert string to float |
 
+### Pico native functions
+
+| Function | Description |
+|----------|-------------|
+| `gpioInit pin` | Initialize a GPIO pin as input (clears DDR bit) |
+| `gpioSetDir pin, mode` | Set GPIO pin direction (1 = output, 0 = input) |
+| `gpioPut pin, value` | Write a digital value (high/low) to a GPIO pin |
+| `gpioGet pin, &var` | Read a GPIO pin's input state into a variable |
+| `gpioPullUp pin` | Enable the internal pull-up resistor on a pin |
+| `gpioPullDown pin` | Enable pull-down on a pin (unsupported on this platform; hangs) |
+| `sleepMs ms` | Busy-wait sleep for the given number of milliseconds |
+
 ## Operators
 
 ### Arithmetic
