@@ -330,6 +330,21 @@ int execute(
         execData->stack.push_back({ TAG_STRING, result });
         break;
     }
+    case 0xDE: { // dereference
+        Variant ptrVar = execData->stack.back(); execData->stack.pop_back();
+        if(ptrVar.type != TAG_INT) {
+            std::cout << "Invalid dereference" << std::endl;
+            return -1;
+        }
+        int ptr = getInt(ptrVar);
+        if(ptr >= execData->variables.size() || ptr < 0) {
+            std::cout << "Invalid dereference" << std::endl;
+            return -1;
+        }
+        Variant variable = execData->variables[ptr];
+        execData->stack.push_back(variable);
+        break;
+    }
     case 0xFF:
         execData->halt = true;
         break;

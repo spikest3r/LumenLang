@@ -129,7 +129,17 @@ int compile(std::string fileName,
         for (const auto& token : tokens) {
             if (token == "=") {
                 bool fromStack = false;
-                if (tokens.size() > 3) {
+                if(tokens[2] == "*") {
+                    if(tokens.size() != 4) {
+                        printError("Syntax error", lineIndex);
+                        return -1;
+                    }
+                    
+                    // dereference
+                    pushToStack(tokens[3], compilerData, bytecode);
+                    bytecode.push_back(0xDE); // dereference onto stack
+                    fromStack = true;
+                } else if (tokens.size() > 3) {
                     std::string formula;
                     std::vector<std::string> strs;
                     bool allStr = false;

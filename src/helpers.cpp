@@ -104,6 +104,7 @@ int getOpCodeOffset(int opcode) {
     case 0xA5: // MOD
     case 0xFE: // RET
     case 0xFF: // HLT
+    case 0xDE:
         return 1;
 
         // 32-bit offset instructions (1 byte opcode + 4 bytes address/offset)
@@ -186,6 +187,7 @@ std::map<int, std::string> disassemblyMap = {
     {0xC5, "JNE32"},
 
     {0xAA, "JOIN"},
+    {0xDE, "DEREF"},
     {0xFE, "RET"},
     {0xFF, "HLT"}
 };
