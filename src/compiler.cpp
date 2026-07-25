@@ -1,5 +1,10 @@
 #include "compiler.h"
 
+struct Function {
+    uint8_t opcode;
+    uint8_t argCount;
+};
+
 inline void emitUint32(std::vector<uint8_t>& bytecode, uint32_t value) {
     bytecode.push_back(value & 0xFF);
     bytecode.push_back((value >> 8) & 0xFF);
@@ -30,7 +35,7 @@ static const std::unordered_map<std::string, ConditionOp> condOpMap = {
     {"!=", NOT_EQUALS}
 };
 
-static const std::unordered_map<ConditionOp, int> condOpcodeMap = {
+static const std::unordered_map<ConditionOp, uint8_t> condOpcodeMap = {
     {EQUALS,        0xC0},
     {GREATER,       0xC1},
     {LESSER,        0xC2},
@@ -39,15 +44,22 @@ static const std::unordered_map<ConditionOp, int> condOpcodeMap = {
     {NOT_EQUALS,    0xC5}
 };
 
-std::unordered_map<std::string, int> funcList = {
-    {"println",   0x01},
-    {"print",     0x02},
-    {"inputInt",  0x03},
-    {"inputStr",  0x04},
-    {"str2int",   0x05},
-    {"int2str",   0x06},
-    {"str2float", 0x07},
-    {"float2str", 0x08}
+std::unordered_map<std::string, Function> funcList = {
+    {"println",   {0x01,1}},
+    {"print",     {0x02,1}},
+    {"inputInt",  {0x03,1}},
+    {"inputStr",  {0x04,1}},
+    {"str2int",   {0x05,2}},
+    {"int2str",   {0x06,2}},
+    {"str2float", {0x07,2}},
+    {"float2str", {0x08,2}},
+    {"assertCapability", {0xA0,1}},
+    {"openFile", {0xA1,2}},
+    {"writeFile", {0xA2, 2}},
+    {"closeFile", {0xA4, 1}},
+    {"randomSeed", {0xA5, 1}},
+    {"random", {0xA6, 1}},
+    {"randomRange", {0xA7, 3}}
 };
 
 void printError(std::string error, int line) {
@@ -109,6 +121,9 @@ int compile(std::string fileName,
     int routineIndex = -1;
     int routineCount = 0;
 
+    int funcArgs = 0;
+    int requiredFuncArgs = 0;
+
     while (std::getline(file, line)) {
         if (verbose) std::cout << line << std::endl;
         auto tokens = tokenizeFormula(line);
@@ -134,7 +149,7 @@ int compile(std::string fileName,
                         printError("Syntax error", lineIndex);
                         return -1;
                     }
-                    
+
                     // dereference
                     pushToStack(tokens[3], compilerData, bytecode);
                     bytecode.push_back(0xDE); // dereference onto stack
@@ -370,7 +385,9 @@ int compile(std::string fileName,
                     auto it = funcList.find(token);
                     if (it != funcList.end()) {
                         op = FUNC_CALL;
-                        funcIndex = it->second;
+                        funcIndex = it->second.opcode;
+                        funcArgs = 0;
+                        requiredFuncArgs = it->second.argCount;
                     }
                     continue;
                 }
@@ -392,6 +409,8 @@ int compile(std::string fileName,
                 bytecode.push_back(varIndex_assign);
                 break;
             case FUNC_CALL:
+                funcArgs++;
+                // fallthrough
             case PUSH_STACK:
             {
                 if (token == ",") {
@@ -474,6 +493,16 @@ int compile(std::string fileName,
 
         switch (op) {
         case FUNC_CALL:
+            if(funcArgs != requiredFuncArgs) {
+                auto it = std::find_if(funcList.begin(), funcList.end(),
+                    [&](const auto& p) { return p.second.opcode == funcIndex; });
+                std::string key = (it != funcList.end()) ? it->first : "<unknown>";
+                std::stringstream ss;
+                ss << "argument count mismatch for '" << key << "': expected " 
+                    << requiredFuncArgs << ", got " << funcArgs << "\n";
+                printError(ss.str(), lineIndex);
+                return -1;
+            }
             bytecode.push_back(0x04); // call function
             bytecode.push_back(funcIndex);
             break;
@@ -592,7 +621,7 @@ int compile(std::string fileName,
             // Write exec functions
             debugFile << "exec" << std::endl;
             for (const auto& func : funcList) {
-                debugFile << func.first << " " << func.second << std::endl;
+                debugFile << func.first << " " << func.second.opcode << std::endl;
             }
         }
     }

@@ -16,7 +16,8 @@ std::vector<std::string> tokenizeFormula(std::string formula) {
     std::string token = "";
     bool isQuoteOpen = false;
     trim_tabs(formula);
-    for (char c : formula) {
+    for(int i = 0; i < formula.size(); i++) {
+        char c = formula[i];
         if (c == '(' || c == ')') {
             if(!isQuoteOpen) {
                 if (token.length() > 0) tokens.push_back(token);
@@ -54,6 +55,19 @@ std::vector<std::string> tokenizeFormula(std::string formula) {
         } else if(c == '#') {
             // comment
             break;
+        } else if(c == '\\') {
+            if(isQuoteOpen) {
+                char next = formula[i+1];
+                switch (next) {
+                    case 'n': token += '\n'; break;
+                    case 't': token += '\t'; break;
+                    case '\\': token += '\\'; break;
+                    case '\'': token += '\''; break;
+                    default: token += next; // or error
+                }
+                i++;
+                continue;
+            }
         }
         token += c;
     }

@@ -137,7 +137,12 @@ int execute(
         auto functionIndex = progData->bytecode[execData->PC + 1];
         auto it = funcMap.find(functionIndex);
         if (it != funcMap.end()) {
-            it->second(execData->stack, execData->variables);
+            try {
+                it->second(execData->stack, execData->variables);
+            } catch(std::exception& s) {
+                std::cerr << "Function error\n" << s.what() << std::endl;
+                execData->halt = true;
+            }
         }
         else {
             std::cerr << "Unknown function index: " << functionIndex << std::endl;
