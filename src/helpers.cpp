@@ -37,7 +37,10 @@ bool isPureNumber(const std::string& s) {
 }
 
 int resolveVariableIndex(std::string keyword, CompilerData* data) {
+    // strip ref and deref
     replaceAll(keyword, "&", "");
+    replaceAll(keyword, "*", "");
+
     auto it = data->variableMap.find(keyword);
 
     if (it != data->variableMap.end()) {
@@ -124,11 +127,15 @@ int getOpCodeOffset(int opcode) {
     }
 }
 
-bool isVar(const std::string &s) {
-    if (s.empty()) return false;
-    if (std::isdigit(static_cast<unsigned char>(s[0]))) return false; // can't start with digit
-    for (char c : s) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') return false;
+bool isVar(const std::string &t) {
+    if (t.empty()) return false;
+    size_t start = (t[0] == '&' || t[0] == '*') ? 1 : 0;
+    if (start >= t.size()) return false;
+    if (!(std::isalpha(static_cast<unsigned char>(t[start])) || t[start] == '_'))
+        return false;
+    for (size_t i = start + 1; i < t.size(); i++) {
+        if (!(std::isalnum(static_cast<unsigned char>(t[i])) || t[i] == '_'))
+            return false;
     }
     return true;
 }
