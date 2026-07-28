@@ -1,5 +1,48 @@
 #include "helpers.h"
 
+// Splits a full URL like "http://host:port/path" into scheme+host and path.
+bool splitUrl(const std::string& url, std::string& hostPart, std::string& pathPart) {
+    size_t schemeEnd = url.find("://");
+    if (schemeEnd == std::string::npos) return false;
+
+    size_t pathStart = url.find('/', schemeEnd + 3);
+    if (pathStart == std::string::npos) {
+        hostPart = url;
+        pathPart = "/";
+    } else {
+        hostPart = url.substr(0, pathStart);
+        pathPart = url.substr(pathStart);
+    }
+    return true;
+}
+
+// Parses "Key: Value\nKey2: Value2\n..." into httplib::Headers
+httplib::Headers parseHeaders(const std::string& headerStr) {
+    httplib::Headers headers;
+    std::istringstream stream(headerStr);
+    std::string line;
+
+    while (std::getline(stream, line)) {
+        if (line.empty()) continue;
+        // strip trailing \r if present (in case of \r\n input)
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+
+        size_t colon = line.find(':');
+        if (colon == std::string::npos) continue;
+
+        std::string key = line.substr(0, colon);
+        std::string value = line.substr(colon + 1);
+
+        // trim leading space on value
+        size_t valStart = value.find_first_not_of(' ');
+        if (valStart != std::string::npos) value = value.substr(valStart);
+
+        headers.emplace(key, value);
+    }
+
+    return headers;
+}
+
 void replaceAll(std::string& str, const std::string& from, const std::string& to) {
     if (from.empty()) return;
     size_t pos = 0;

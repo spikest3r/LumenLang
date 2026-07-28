@@ -56,10 +56,17 @@ std::unordered_map<std::string, Function> funcList = {
     {"assertCapability", {0xA0,1}},
     {"openFile", {0xA1,2}},
     {"writeFile", {0xA2, 2}},
+    {"readFile", {0xA3, 2}},
     {"closeFile", {0xA4, 1}},
     {"randomSeed", {0xA5, 1}},
     {"random", {0xA6, 1}},
-    {"randomRange", {0xA7, 3}}
+    {"randomRange", {0xA7, 3}},
+    {"httpRequest", {0xA8, 6}},
+    {"strlen", {0xA9, 2}},
+    {"substr", {0xAA, 4}},
+    {"strfind", {0xAB, 3}},
+    {"strcase", {0xAC, 3}},
+    {"trim", {0xAD, 2}}
 };
 
 void printError(std::string error, int line) {

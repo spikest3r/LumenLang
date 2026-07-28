@@ -2,15 +2,21 @@
 
 #include <set>
 #include <random>
+#include "httplib.h"
 
 std::set<std::string> capabilitySet = {
-    "FS", "random"
+    "FS", "random", "HTTP"
 };
 
 int fileHandleId = 0;
 std::unordered_map<int, std::fstream*> fileHandles;
 
 static std::mt19937 rngEngine(std::random_device{}());
+
+std::string toUpper(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(), ::toupper);
+    return s;
+}
 
 std::unordered_map<int, NativeFn> funcMap = {
     {0x01, [](std::vector<Variant>& stack, std::vector<Variant>& variables) {
@@ -49,15 +55,9 @@ std::unordered_map<int, NativeFn> funcMap = {
 
         int num = 0;
         std::string str = "0";
-        if(value.type == TAG_STRING) str = std::get<std::string>(value.data);
+        str = std::get<std::string>(value.data);
 
-        try {
-            num = std::stoi(str);
-        } catch (const std::invalid_argument& e) {
-            num = 0;
-        } catch (const std::out_of_range& e) {
-            num = 0;
-        }
+        num = std::stoi(str);
 
         variables[varIndex].type = TAG_INT;
         variables[varIndex].data = num;
@@ -68,7 +68,7 @@ std::unordered_map<int, NativeFn> funcMap = {
         auto value = stack.back(); stack.pop_back();
 
         int num = 0;
-        if(value.type == TAG_INT) num = getInt(value);
+        num = getInt(value);
 
         std::string str = std::to_string(num);
         variables[varIndex].type = TAG_STRING;
@@ -81,7 +81,7 @@ std::unordered_map<int, NativeFn> funcMap = {
 
         double num = 0.0;
         std::string str = "0";
-        if(value.type == TAG_STRING) str = std::get<std::string>(value.data);
+        str = std::get<std::string>(value.data);
 
         try {
             num = std::stod(str);
@@ -129,9 +129,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         auto handleVarIndex = getInt(stack.back()); stack.pop_back();
 
         auto value = stack.back(); stack.pop_back();
-        if(value.type != TAG_STRING) {
-            throw std::runtime_error("openFile failed: invalid value type");
-        }
 
         auto filename = std::get<std::string>(value.data);
 
@@ -150,9 +147,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         auto handle = getInt(stack.back()); stack.pop_back();
 
         auto value = stack.back(); stack.pop_back();
-        if(value.type != TAG_STRING) {
-            throw std::runtime_error("writeFile failed: invalid value type");
-        }
 
         auto valueToWrite = std::get<std::string>(value.data);
 
@@ -220,5 +214,132 @@ std::unordered_map<int, NativeFn> funcMap = {
 
         variables[varIndex].type = TAG_INT;
         variables[varIndex].data = val;
+    }},
+    {0xA8, [](std::vector<Variant>& stack, std::vector<Variant>& variables) {
+        // httpRequest
+        auto outVarIndex = getInt(stack.back()); stack.pop_back();
+        auto statusVarIndex = getInt(stack.back()); stack.pop_back();
+        auto body = std::get<std::string>(stack.back().data); stack.pop_back();
+        auto headerStr = std::get<std::string>(stack.back().data); stack.pop_back();
+        auto url = std::get<std::string>(stack.back().data); stack.pop_back();
+        auto method = std::get<std::string>(stack.back().data); stack.pop_back();
+
+        int outStatus;
+        std::string outResponse;
+
+        std::string host, path;
+        if (!splitUrl(url, host, path)) {
+            throw std::runtime_error("httpGet failed: invalid url");
+        }
+
+        httplib::Client cli(host);
+        cli.set_connection_timeout(5, 0);
+        cli.set_read_timeout(10, 0);
+        cli.set_follow_location(true);
+
+        httplib::Headers headers = parseHeaders(headerStr);
+        std::string m = toUpper(method);
+
+        httplib::Result res;
+        if (m == "GET") {
+            res = cli.Get(path, headers);
+        } else if (m == "POST") {
+            res = cli.Post(path, headers, body, "application/octet-stream");
+        } else if (m == "PUT") {
+            res = cli.Put(path, headers, body, "application/octet-stream");
+        } else if (m == "DELETE") {
+            res = cli.Delete(path, headers);
+        } else {
+            throw std::runtime_error("unsupported method: " + method);
+        }
+
+        if (res) {
+            outStatus = res->status;
+            outResponse = res->body;
+        } else {
+            outStatus = -1;
+            outResponse = "request failed: " + httplib::to_string(res.error());
+        }
+
+        variables[outVarIndex].type = TAG_STRING;
+        variables[outVarIndex].data = outResponse;
+
+        variables[statusVarIndex].type = TAG_INT;
+        variables[statusVarIndex].data = outStatus;
+    }},
+    {0xA9, [](std::vector<Variant>& stack, std::vector<Variant>& variables) {
+        // strlen
+        auto varIndex = getInt(stack.back()); stack.pop_back();
+        auto value = stack.back(); stack.pop_back();
+
+        auto str = std::get<std::string>(value.data);
+
+        variables[varIndex].type = TAG_INT;
+        variables[varIndex].data = static_cast<int64_t>(str.size());
+    }},
+    {0xAA, [](std::vector<Variant>& stack, std::vector<Variant>& variables) {
+        // substr(s, start, len, &out)
+        auto varIndex = getInt(stack.back()); stack.pop_back();
+        auto lenArg = getInt(stack.back()); stack.pop_back();
+        auto startArg = getInt(stack.back()); stack.pop_back();
+        auto value = stack.back(); stack.pop_back();
+
+        auto str = std::get<std::string>(value.data);
+
+        std::string result;
+        if (startArg >= 0 && static_cast<size_t>(startArg) < str.size()) {
+            result = str.substr(startArg, lenArg);
+        }
+
+        variables[varIndex].type = TAG_STRING;
+        variables[varIndex].data = result;
+    }},
+    {0xAB, [](std::vector<Variant>& stack, std::vector<Variant>& variables) {
+        // strfind(s, needle, &index)
+        auto varIndex = getInt(stack.back()); stack.pop_back();
+        auto needleVal = stack.back(); stack.pop_back();
+        auto strVal = stack.back(); stack.pop_back();
+
+        auto str = std::get<std::string>(strVal.data);
+        auto needle = std::get<std::string>(needleVal.data);
+
+        auto pos = str.find(needle);
+        int64_t result = (pos == std::string::npos) ? -1 : static_cast<int64_t>(pos);
+
+        variables[varIndex].type = TAG_INT;
+        variables[varIndex].data = result;
+    }},
+    {0xAC, [](std::vector<Variant>& stack, std::vector<Variant>& variables) {
+        // toUpper(s, &out) / toLower(s, &out) via a flag arg (0=lower, 1=upper)
+        auto varIndex = getInt(stack.back()); stack.pop_back();
+        auto upperFlag = getInt(stack.back()); stack.pop_back();
+        auto value = stack.back(); stack.pop_back();
+
+        auto str = std::get<std::string>(value.data);
+
+        if (upperFlag) {
+            std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+        } else {
+            std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+        }
+
+        variables[varIndex].type = TAG_STRING;
+        variables[varIndex].data = str;
+    }},
+    {0xAD, [](std::vector<Variant>& stack, std::vector<Variant>& variables) {
+        // trim(s, &out)
+        auto varIndex = getInt(stack.back()); stack.pop_back();
+        auto value = stack.back(); stack.pop_back();
+
+        auto str = std::get<std::string>(value.data);
+
+        const char* ws = " \t\n\r\f\v";
+        size_t start = str.find_first_not_of(ws);
+        size_t end = str.find_last_not_of(ws);
+
+        std::string result = (start == std::string::npos) ? "" : str.substr(start, end - start + 1);
+
+        variables[varIndex].type = TAG_STRING;
+        variables[varIndex].data = result;
     }},
 };
