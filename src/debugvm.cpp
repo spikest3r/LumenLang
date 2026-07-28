@@ -430,6 +430,11 @@ int run_debug(
                     step(
                         progData, &execData
                     );
+                    
+                    if(execData.halt) {
+                        resume = false;
+                        std::cout << "Execution finished" << std::endl;
+                    }
                 }
             }
         } else if(command == "continue") {

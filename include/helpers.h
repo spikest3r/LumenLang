@@ -1,6 +1,7 @@
 #pragma once
 #include "includes.h"
 #include "types.h"
+#include "httplib.h"
 
 // Hash for (TypeTag as int, double value) pairs, used as the constPoolMap key.
 struct ConstPoolKeyHash {
@@ -23,6 +24,8 @@ struct CompilerData {
     std::unordered_map<std::pair<int, double>, int, ConstPoolKeyHash> constPoolMap;
 };
 
+bool splitUrl(const std::string& url, std::string& hostPart, std::string& pathPart);
+httplib::Headers parseHeaders(const std::string& headerStr);
 void replaceAll(std::string& str, const std::string& from, const std::string& to);
 bool isPureNumber(const std::string& s);
 int resolveVariableIndex(std::string keyword, CompilerData* data);

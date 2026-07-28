@@ -30,6 +30,8 @@ static int g_constPoolSize = 0;
 
 static int g_variableCount = 0;
 
+static int halt = 0;
+
 typedef enum {
     TAG_STRING = 1,
     TAG_INT = 2,
@@ -124,8 +126,9 @@ int loadFromFlash(const uint8_t* data, int dataSize) {
     int isV2 = (sig0 == 0xFE && sig1 == 0xFB);
     int isV3 = (sig0 == 0xFE && sig1 == 0xFC);
     int isV4 = (sig0 == 0xFE && sig1 == 0xFD);
+    int isV5 = (sig0 == 0xFE && sig1 == 0xFE);
 
-    if (!isV2 && !isV3 && !isV4) {
+    if (!isV2 && !isV3 && !isV4 && !isV5) {
         send_uart("Invalid signature\n");
         if (sig0 == 0xFE && sig1 == 0xFA) {
             send_uart("v1 Precompiled Lumen binaries are not compatible with v2+ Lumen runtime\n");
@@ -162,7 +165,7 @@ int loadFromFlash(const uint8_t* data, int dataSize) {
     // const pool
     int cpSize = readInt(data, &pos);
     g_constPoolSize = cpSize;
-    if (isV3 || isV4) {
+    if (!isV2) {
         for (int i = 0; i < cpSize; i++) {
             g_constPool[i] = readDouble(data, &pos);
         }
@@ -209,6 +212,7 @@ int getOpCodeOffset(int opcode) {
         case 0xA4:
         case 0xA5:
         case 0xAA:
+        case 0xDE:
         case 0xFE:
             return 1;
         case 0x06: // JUMP32
@@ -264,7 +268,7 @@ void fn_inputStr(Variant stack[16], Variant variables[16], int* sp) {
     Variant* varRef = &stack[*sp];
     (*sp)--;
 
-    memset(buffer_inputStr, 0, sizeof(buffer_int2str));
+    memset(buffer_inputStr, 0, sizeof(buffer_inputStr));
     uart_readline(buffer_inputStr, sizeof(buffer_inputStr));
 
     variables[varRef->data.i].type = TAG_STRING;
@@ -353,7 +357,7 @@ void fn_float2str(Variant stack[16], Variant variables[16], int* sp) {
     else if(value->type == TAG_INT) num = (double)value->data.i;
 
     memset(buffer_float2str, 0, sizeof(buffer_float2str));
-    snprintf(buffer_float2str, sizeof(buf), "%f", num);
+    snprintf(buffer_float2str, sizeof(buffer_float2str), "%f", num);
 
     variables[varRef->data.i].type = TAG_STRING;
     variables[varRef->data.i].data.str = buffer_float2str;
@@ -417,6 +421,25 @@ void fn_gpioPullDown(Variant stack[16], Variant variables[16], int* sp) {
     gpio_pull_down(pin_num->data.i);
 }
 
+void fn_assertCapability(Variant stack[16], Variant variables[16], int* sp) {
+    // TODO: Implement lookup for capability support
+    // As of now, "random", "FS" and "time" are not implemented for Pico, so we set halt flag anyway
+    // last value on stack is capability name
+
+    Variant* capability = &stack[*sp];  
+    if(capability->type != TAG_STRING) {
+        send_uart("assertCapability failed: invalid type\n");
+        halt = 1;
+        return;
+    }
+    (*sp)--;
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), "assertCapability failed: capability \'%s\' is not supported on this platform\n", capability->data.str);
+    send_uart(buffer);
+    halt = 1;
+}
+
+
 NativeFn funcTable[] = {
     NULL,           // 0x00 unused
     fn_println,     // 0x01
@@ -443,6 +466,13 @@ NativeFn customFuncTable[] = {
 
 #define CUSTOM_FUNC_COUNT (sizeof(customFuncTable) / sizeof(customFuncTable[0]))
 
+NativeFn capabilityFuncTable[] = {
+    fn_assertCapability // 0xA0
+    // rest are handled by EXEC as halt stubs
+};
+
+#define CAPABILITY_FUNC_COUNT (sizeof(capabilityFuncTable) / sizeof(capabilityFuncTable[0]))
+
 char joinBuffer[MAX_STRING_LEN];
 
 int execute(
@@ -457,7 +487,6 @@ int execute(
     int stackPointer = -1;
     int pcStackPointer = -1;
     int PC = 0;
-    int halt = 0;
 
     while(1) {
         int opcode = bytecode[PC];
@@ -541,6 +570,16 @@ int execute(
                     }
                     if(customFuncTable[customIndex])
                         customFuncTable[customIndex](stack, variables, &stackPointer);
+                } else if(addr >= 0xA0) {
+                    // capabilities
+                    int customIndex = addr - 0xA0;
+                    // TODO: As capabilities for Pico platform grow, implement proper capability availability handler
+                    if(customIndex < 0 || (unsigned)customIndex >= CAPABILITY_FUNC_COUNT) {
+                        send_uart("Invalid native call\n");
+                        return -1;
+                    }
+                    if(capabilityFuncTable[customIndex])
+                        capabilityFuncTable[customIndex](stack, variables, &stackPointer);
                 } else {
                     if(addr < 0 || (unsigned)addr >= BASE_FUNC_COUNT) {
                         send_uart("Invalid native call\n");
@@ -708,7 +747,7 @@ int execute(
                     totalLen += strlen(stack[stackPointer - i].data.str);
                 }
 
-                malloc(joinBuffer, 0, sizeof(joinBuffer));
+                memset(joinBuffer, 0, sizeof(joinBuffer));
                 char *dst = joinBuffer;
 
                 for(int i = strCount - 1; i >= 0; i--) {
@@ -723,8 +762,28 @@ int execute(
 
                 stackPointer++;
                 stack[stackPointer].type = TAG_STRING;
-                stack[stackPointer].data.str = result;
+                stack[stackPointer].data.str = joinBuffer;
 
+                break;
+            }
+            case 0xDE: {
+                if(stackPointer < 0) return -1;
+                Variant ptrVar = stack[stackPointer];
+                stackPointer--;
+
+                if(ptrVar.type != TAG_INT) {
+                    send_uart("Invalid dereference\n");
+                    return -1;
+                }
+
+                int ptr = ptrVar.data.i;
+                if(ptr < 0 || ptr >= g_variableCount) {
+                    send_uart("Invalid dereference\n");
+                    return -1;
+                }
+
+                stackPointer++;
+                stack[stackPointer] = variables[ptr];
                 break;
             }
             case 0xFF:
