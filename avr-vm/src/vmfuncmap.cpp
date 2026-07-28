@@ -171,3 +171,23 @@ void fn_float2str(Variant stack[16], Variant variables[16], int* sp) {
   variables[varRef->data.i].type = TAG_STRING;
   variables[varRef->data.i].data.str = str;
 }
+
+// capabilities
+
+void fn_assertCapability(Variant stack[16], Variant variables[16], int* sp) {
+    // TODO: Implement lookup for capability support
+    // As of now, "random", "FS" and "time" are not implemented, so we set halt flag anyway
+    // last value on stack is capability name
+
+    Variant* capability = &stack[*sp];  
+    if(capability->type != TAG_STRING) {
+        send_uart("assertCapability failed: invalid type\n");
+        halt = 1;
+        return;
+    }
+    (*sp)--;
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), "assertCapability failed: capability \'%s\' is not supported on this platform\n", capability->data.str);
+    send_uart(buffer);
+    halt = 1;
+}

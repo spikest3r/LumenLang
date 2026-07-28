@@ -1,5 +1,48 @@
 #include "helpers.h"
 
+// Splits a full URL like "http://host:port/path" into scheme+host and path.
+bool splitUrl(const std::string& url, std::string& hostPart, std::string& pathPart) {
+    size_t schemeEnd = url.find("://");
+    if (schemeEnd == std::string::npos) return false;
+
+    size_t pathStart = url.find('/', schemeEnd + 3);
+    if (pathStart == std::string::npos) {
+        hostPart = url;
+        pathPart = "/";
+    } else {
+        hostPart = url.substr(0, pathStart);
+        pathPart = url.substr(pathStart);
+    }
+    return true;
+}
+
+// Parses "Key: Value\nKey2: Value2\n..." into httplib::Headers
+httplib::Headers parseHeaders(const std::string& headerStr) {
+    httplib::Headers headers;
+    std::istringstream stream(headerStr);
+    std::string line;
+
+    while (std::getline(stream, line)) {
+        if (line.empty()) continue;
+        // strip trailing \r if present (in case of \r\n input)
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+
+        size_t colon = line.find(':');
+        if (colon == std::string::npos) continue;
+
+        std::string key = line.substr(0, colon);
+        std::string value = line.substr(colon + 1);
+
+        // trim leading space on value
+        size_t valStart = value.find_first_not_of(' ');
+        if (valStart != std::string::npos) value = value.substr(valStart);
+
+        headers.emplace(key, value);
+    }
+
+    return headers;
+}
+
 void replaceAll(std::string& str, const std::string& from, const std::string& to) {
     if (from.empty()) return;
     size_t pos = 0;
@@ -37,7 +80,10 @@ bool isPureNumber(const std::string& s) {
 }
 
 int resolveVariableIndex(std::string keyword, CompilerData* data) {
+    // strip ref and deref
     replaceAll(keyword, "&", "");
+    replaceAll(keyword, "*", "");
+
     auto it = data->variableMap.find(keyword);
 
     if (it != data->variableMap.end()) {
@@ -104,6 +150,7 @@ int getOpCodeOffset(int opcode) {
     case 0xA5: // MOD
     case 0xFE: // RET
     case 0xFF: // HLT
+    case 0xDE:
         return 1;
 
         // 32-bit offset instructions (1 byte opcode + 4 bytes address/offset)
@@ -123,11 +170,15 @@ int getOpCodeOffset(int opcode) {
     }
 }
 
-bool isVar(const std::string &s) {
-    if (s.empty()) return false;
-    if (std::isdigit(static_cast<unsigned char>(s[0]))) return false; // can't start with digit
-    for (char c : s) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') return false;
+bool isVar(const std::string &t) {
+    if (t.empty()) return false;
+    size_t start = (t[0] == '&' || t[0] == '*') ? 1 : 0;
+    if (start >= t.size()) return false;
+    if (!(std::isalpha(static_cast<unsigned char>(t[start])) || t[start] == '_'))
+        return false;
+    for (size_t i = start + 1; i < t.size(); i++) {
+        if (!(std::isalnum(static_cast<unsigned char>(t[i])) || t[i] == '_'))
+            return false;
     }
     return true;
 }
@@ -186,6 +237,7 @@ std::map<int, std::string> disassemblyMap = {
     {0xC5, "JNE32"},
 
     {0xAA, "JOIN"},
+    {0xDE, "DEREF"},
     {0xFE, "RET"},
     {0xFF, "HLT"}
 };

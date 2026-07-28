@@ -183,7 +183,10 @@ int main(int argc, char** argv) {
         std::string inFile = compileFlag ? file_name + ".bin" : file_name;
 
         BinaryProgram inProg;
-        inProg.load(inFile);
+        if(!inProg.load(inFile)) {
+            std::cout << "Failed to load " << inFile << std::endl;
+            return -1;
+        }
         
         int status = -1;
 

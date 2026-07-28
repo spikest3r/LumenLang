@@ -10,6 +10,8 @@ typedef void (*NativeFn)(Variant stack[16], Variant variables[16], int* sp);
 
 static char buf[32];
 
+int halt = 0;
+
 NativeFn funcTable[] = {
   NULL,          
   fn_println,    
@@ -43,6 +45,13 @@ NativeFn customFuncTable[] = {
 
 #define CUSTOM_FUNC_COUNT (sizeof(customFuncTable) / sizeof(customFuncTable[0]))
 
+NativeFn capabilityFuncTable[] = {
+    fn_assertCapability // 0xA0
+    // rest are handled by EXEC as halt stubs
+};
+
+#define CAPABILITY_FUNC_COUNT (sizeof(capabilityFuncTable) / sizeof(capabilityFuncTable[0]))
+
 int execute(
   const uint8_t* bytecode,
   const int bytecodeSize,
@@ -57,7 +66,6 @@ int execute(
   int pcStackPointer = -1;
   int PC = 0;
   int routineBase = 0;
-  int halt = 0;
 
   while (1) {
     int opcode = bytecode[PC];
@@ -142,20 +150,30 @@ int execute(
         {
           int addr = bytecode[PC + 1];
 
-          if (addr >= 0xD0 && addr <= 0xFF) {
+          if(addr >= 0xD0 && addr <= 0xFF) {
             int customIndex = addr - 0xD0;
-            if (customIndex < 0 || (unsigned)customIndex >= CUSTOM_FUNC_COUNT) {
+            if(customIndex < 0 || (unsigned)customIndex >= CUSTOM_FUNC_COUNT) {
               send_uart("Invalid native call\n");
               return -1;
             }
-            if (customFuncTable[customIndex])
-              customFuncTable[customIndex](stack, variables, &stackPointer);
+            if(customFuncTable[customIndex])
+                customFuncTable[customIndex](stack, variables, &stackPointer);
+          } else if(addr >= 0xA0) {
+            // capabilities
+            int customIndex = addr - 0xA0;
+            // TODO: As capabilities for platform grow, implement proper capability availability handler
+            if(customIndex < 0 || (unsigned)customIndex >= CAPABILITY_FUNC_COUNT) {
+              send_uart("Invalid native call\n");
+              return -1;
+            }
+            if(capabilityFuncTable[customIndex])
+                capabilityFuncTable[customIndex](stack, variables, &stackPointer);
           } else {
-            if (addr < 0 || (unsigned)addr >= BASE_FUNC_COUNT) {
+            if(addr < 0 || (unsigned)addr >= BASE_FUNC_COUNT) {
               send_uart("Invalid native call\n");
               return -1;
             }
-            if (funcTable[addr])
+            if(funcTable[addr])
               funcTable[addr](stack, variables, &stackPointer);
           }
 
@@ -371,6 +389,27 @@ int execute(
           stack[stackPointer].type = TAG_STRING;
           stack[stackPointer].data.str = buf;
 
+          break;
+        }
+      case 0xDE:
+        {
+          if (stackPointer < 0) return -1;
+          Variant ptrVar = stack[stackPointer];
+          stackPointer--;
+
+          if (ptrVar.type != TAG_INT) {
+            send_uart("Invalid dereference\n");
+            return -1;
+          }
+
+          int ptr = ptrVar.data.i;
+          if (ptr < 0 || ptr >= 16) {
+            send_uart("Invalid dereference\n");
+            return -1;
+          }
+
+          stackPointer++;
+          stack[stackPointer] = variables[ptr];
           break;
         }
       case 0xFF:

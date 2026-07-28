@@ -10,3 +10,4 @@ void fn_str2int(Variant stack[16], Variant variables[16], int* sp);
 void fn_int2str(Variant stack[16], Variant variables[16], int* sp);
 void fn_str2float(Variant stack[16], Variant variables[16], int* sp);
 void fn_float2str(Variant stack[16], Variant variables[16], int* sp);
+void fn_assertCapability(Variant stack[16], Variant variables[16], int* sp);

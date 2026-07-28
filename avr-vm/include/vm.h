@@ -2,6 +2,8 @@
 
 #include "includes.h"
 
+extern int halt;
+
 int execute(
   const uint8_t* bytecode,
   const int bytecodeSize,
