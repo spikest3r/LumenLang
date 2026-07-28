@@ -137,7 +137,12 @@ int execute(
         auto functionIndex = progData->bytecode[execData->PC + 1];
         auto it = funcMap.find(functionIndex);
         if (it != funcMap.end()) {
-            it->second(execData->stack, execData->variables);
+            try {
+                it->second(execData->stack, execData->variables);
+            } catch(std::exception& s) {
+                std::cerr << "Function error\n" << s.what() << std::endl;
+                execData->halt = true;
+            }
         }
         else {
             std::cerr << "Unknown function index: " << functionIndex << std::endl;
@@ -328,6 +333,21 @@ int execute(
             result = str + result; // prepend to maintain order
         }
         execData->stack.push_back({ TAG_STRING, result });
+        break;
+    }
+    case 0xDE: { // dereference
+        Variant ptrVar = execData->stack.back(); execData->stack.pop_back();
+        if(ptrVar.type != TAG_INT) {
+            std::cout << "Invalid dereference" << std::endl;
+            return -1;
+        }
+        int ptr = getInt(ptrVar);
+        if(ptr >= execData->variables.size() || ptr < 0) {
+            std::cout << "Invalid dereference" << std::endl;
+            return -1;
+        }
+        Variant variable = execData->variables[ptr];
+        execData->stack.push_back(variable);
         break;
     }
     case 0xFF:

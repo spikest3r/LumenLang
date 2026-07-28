@@ -1,5 +1,10 @@
 #include "compiler.h"
 
+struct Function {
+    uint8_t opcode;
+    uint8_t argCount;
+};
+
 inline void emitUint32(std::vector<uint8_t>& bytecode, uint32_t value) {
     bytecode.push_back(value & 0xFF);
     bytecode.push_back((value >> 8) & 0xFF);
@@ -30,7 +35,7 @@ static const std::unordered_map<std::string, ConditionOp> condOpMap = {
     {"!=", NOT_EQUALS}
 };
 
-static const std::unordered_map<ConditionOp, int> condOpcodeMap = {
+static const std::unordered_map<ConditionOp, uint8_t> condOpcodeMap = {
     {EQUALS,        0xC0},
     {GREATER,       0xC1},
     {LESSER,        0xC2},
@@ -39,15 +44,29 @@ static const std::unordered_map<ConditionOp, int> condOpcodeMap = {
     {NOT_EQUALS,    0xC5}
 };
 
-std::unordered_map<std::string, int> funcList = {
-    {"println",   0x01},
-    {"print",     0x02},
-    {"inputInt",  0x03},
-    {"inputStr",  0x04},
-    {"str2int",   0x05},
-    {"int2str",   0x06},
-    {"str2float", 0x07},
-    {"float2str", 0x08}
+std::unordered_map<std::string, Function> funcList = {
+    {"println",   {0x01,1}},
+    {"print",     {0x02,1}},
+    {"inputInt",  {0x03,1}},
+    {"inputStr",  {0x04,1}},
+    {"str2int",   {0x05,2}},
+    {"int2str",   {0x06,2}},
+    {"str2float", {0x07,2}},
+    {"float2str", {0x08,2}},
+    {"assertCapability", {0xA0,1}},
+    {"openFile", {0xA1,2}},
+    {"writeFile", {0xA2, 2}},
+    {"readFile", {0xA3, 2}},
+    {"closeFile", {0xA4, 1}},
+    {"randomSeed", {0xA5, 1}},
+    {"random", {0xA6, 1}},
+    {"randomRange", {0xA7, 3}},
+    {"httpRequest", {0xA8, 6}},
+    {"strlen", {0xA9, 2}},
+    {"substr", {0xAA, 4}},
+    {"strfind", {0xAB, 3}},
+    {"strcase", {0xAC, 3}},
+    {"trim", {0xAD, 2}}
 };
 
 void printError(std::string error, int line) {
@@ -96,6 +115,8 @@ int compile(const std::string& script,
     std::vector<int> condJumpStack;
     std::vector<int> elseJumpStack;
 
+    std::string functionArgument = "";
+
     int blockDepth = 0;
     std::vector<bool> elseDefined;
 
@@ -103,6 +124,9 @@ int compile(const std::string& script,
     bool inRoutine = false;
     int routineIndex = -1;
     int routineCount = 0;
+
+    int funcArgs = 0;
+    int requiredFuncArgs = 0;
 
     while (std::getline(stream, line)) {
         if (verbose) std::cout << line << std::endl;
@@ -123,120 +147,23 @@ int compile(const std::string& script,
 
         for (const auto& token : tokens) {
             if (token == "=") {
-                bool fromStack = false;
-                if (tokens.size() > 3) {
-                    std::string formula;
-                    std::vector<std::string> strs;
-                    bool allStr = false;
-                    bool mixed = false;
-                    for (size_t i = 2; i < tokens.size(); i++) {
-                        auto t = tokens[i];
-                        if (t == "..") {
-                            if (mixed) {
-                                printError("Syntax error", lineIndex);
-                                return -1;
-                            }
-                            else {
-                                allStr = true;
-                            }
-                        }
-                        else if (t == "+" || t == "-" || t == "*" || t == "/" || t == "%" || t == "^") {
-                            if (allStr) {
-                                printError("Syntax error", lineIndex);
-                                return -1;
-                            }
-                            else {
-                                mixed = true;
-                            }
-                        }
-                    }
-                    mixed = false;
-                    for (size_t i = 2; i < tokens.size(); i++) {
-                        bool isStr = false;
-                        if (tokens[i].starts_with("'")) {
-                            isStr = true;
-                            if (!allStr && !mixed) {
-                                allStr = true;
-                            }
-                            else if (!allStr && mixed) {
-                                printError("Syntax error", lineIndex);
-                                return -1;
-                            }
-                        }
-                        else {
-                            bool var = false;
-                            if (allStr) {
-                                var = isVar(tokens[i]);
-                                isStr = var;
-                            }
-                            if (!var) {
-                                if (tokens[i] != "..") {
-                                    if (allStr && !mixed) {
-                                        mixed = true;
-                                    }
-                                    else if (allStr && mixed) {
-                                        printError("Syntax error", lineIndex);
-                                        return -1;
-                                    }
-                                }
-                            }
-                        }
-
-                        if (isStr) {
-                            if (tokens[i] != "..") {
-                                strs.push_back(tokens[i]);
-                            }
-                        }
-                        else {
-                            formula += tokens[i];
-                        }
-                    }
-                    if (allStr) {
-                        for (const auto& str : strs) {
-                            bytecode.push_back(0x03); // push to stack
-                            if (isVar(str)) {
-                                bytecode.push_back(0x03); // variable
-                                auto varIndex = resolveVariableIndex(str, compilerData);
-                                bytecode.push_back(varIndex); // variable index
-                            }
-                            else {
-                                auto strIndex = resolveString(str, compilerData);
-                                bytecode.push_back(0x01); // string
-                                bytecode.push_back(strIndex); // string index
-                            }
-                        }
-
-                        // push str count
-                        bytecode.push_back(0x03); // push to stack
-                        bytecode.push_back(0x04); // raw uint8_t
-                        bytecode.push_back(static_cast<uint8_t>(strs.size())); // value
-
-                        bytecode.push_back(0xAA); // join strings
-                        fromStack = true;
-                    }
-                    else if (mixed) {
-                        printError("Syntax error", lineIndex);
-                        return -1;
-                    }
-                    else {
-                        compileExpression(
-                            formula, compilerData, bytecode
-                        ); // result in stack
-                        fromStack = true;
-                    }
+                std::string formula;
+                std::vector<std::string> strs;
+                
+                for (size_t i = 2; i < tokens.size(); i++) {
+                    formula += tokens[i];
                 }
-                if (op != NONE) {
-                    printError("Syntax error", lineIndex);
-                    return -1;
-                }
-                if (!fromStack) op = ASSIGN;
-                if (fromStack) bytecode.push_back(0x02);
+
+                compileExpression(
+                    formula, compilerData, bytecode
+                ); // result in stack
+                
+                bytecode.push_back(0x02);
                 keyword = tokens[0];
                 auto var_index = resolveVariableIndex(keyword, compilerData);
                 varIndex_assign = var_index;
-                if (fromStack) bytecode.push_back(var_index);
-                if (fromStack) break;
-                continue;
+                bytecode.push_back(var_index);
+                break;
             }
             else if (token == "label") {
                 if (op != NONE) {
@@ -355,7 +282,9 @@ int compile(const std::string& script,
                     auto it = funcList.find(token);
                     if (it != funcList.end()) {
                         op = FUNC_CALL;
-                        funcIndex = it->second;
+                        funcIndex = it->second.opcode;
+                        funcArgs = 0;
+                        requiredFuncArgs = it->second.argCount;
                     }
                     continue;
                 }
@@ -371,19 +300,18 @@ int compile(const std::string& script,
                 subroutineBytecode[routineIndex] = std::vector<uint8_t>();
             }
             break;
-            case ASSIGN:
-                pushToStack(token, compilerData, bytecode);
-                bytecode.push_back(0x02); // POP
-                bytecode.push_back(varIndex_assign);
-                break;
             case FUNC_CALL:
-            case PUSH_STACK:
+            //case PUSH_STACK:
             {
                 if (token == ",") {
-                    printError("Syntax error", lineIndex);
-                    return -1;
+                    compileExpression(
+                        functionArgument, compilerData, bytecode
+                    ); // result in stack
+                    funcArgs++;
+                    functionArgument.clear();
+                    break;
                 }
-                pushToStack(token, compilerData, bytecode);
+                functionArgument += token;
             }
             break;
             case LABEL:
@@ -459,6 +387,22 @@ int compile(const std::string& script,
 
         switch (op) {
         case FUNC_CALL:
+            compileExpression(
+                functionArgument, compilerData, bytecode
+            ); // result in stack
+            funcArgs++;
+            functionArgument.clear();
+
+            if(funcArgs != requiredFuncArgs) {
+                auto it = std::find_if(funcList.begin(), funcList.end(),
+                    [&](const auto& p) { return p.second.opcode == funcIndex; });
+                std::string key = (it != funcList.end()) ? it->first : "<unknown>";
+                std::stringstream ss;
+                ss << "argument count mismatch for '" << key << "': expected " 
+                    << requiredFuncArgs << ", got " << funcArgs << "\n";
+                printError(ss.str(), lineIndex);
+                return -1;
+            }
             bytecode.push_back(0x04); // call function
             bytecode.push_back(funcIndex);
             break;
