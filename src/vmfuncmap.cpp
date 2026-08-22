@@ -23,6 +23,11 @@ EM_ASYNC_JS(char*, js_request_input, (), {
 });
 
 static std::string getUserInput() {
+    // std::cin normally triggers stdio's implicit fflush(stdout) before a blocking
+    // read; bypassing cin here means we have to flush explicitly or buffered output
+    // stays stuck behind whatever gets printed next.
+    std::cout.flush();
+    fflush(stdout);
     char* ptr = js_request_input();
     std::string result(ptr);
     free(ptr);
