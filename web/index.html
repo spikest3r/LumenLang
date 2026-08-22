@@ -167,6 +167,50 @@
     white-space: pre-wrap;
     word-break: break-word;
   }
+
+  #userInputContainer {
+    padding: 6px 14px;
+    background: #0d0f12;
+    border-top: 1px solid #262b32;
+    display: none;
+    gap: 6px;
+  }
+
+  #userInputContainer.active {
+    display: flex;
+  }
+
+  #userInput {
+    flex: 1;
+    background: #0d0f12;
+    border: 1px solid #262b32;
+    color: #d8dee4;
+    font-family: monospace;
+    font-size: 13px;
+    padding: 8px;
+    border-radius: 3px;
+  }
+
+  #userInput:focus {
+    outline: none;
+    border-color: #5fb3a3;
+  }
+
+  #userInputSubmit {
+    background: transparent;
+    border: 1px solid #262b32;
+    color: #d8dee4;
+    font-family: monospace;
+    font-size: 12px;
+    padding: 5px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  #userInputSubmit:hover {
+    border-color: #5fb3a3;
+    color: #5fb3a3;
+  }
 </style>
 </head>
 <body>
@@ -215,6 +259,10 @@
   <div class="split"></div>
   <div class="pane">
     <div id="console"></div>
+    <div id="userInputContainer">
+      <input type="text" id="userInput" placeholder="input">
+      <button id="userInputSubmit">Submit</button>
+    </div>
   </div>
 </main>
 
@@ -234,6 +282,10 @@
 
   const loadLmnInput    = document.getElementById('loadLmnInput');
   const loadBinInput    = document.getElementById('loadBinInput');
+
+  const userInputContainer = document.getElementById('userInputContainer');
+  const userInput           = document.getElementById('userInput');
+  const userInputSubmit     = document.getElementById('userInputSubmit');
 
   const mNew            = document.getElementById('m-new');
   const mOpenLmn        = document.getElementById('m-openLmn');
@@ -278,10 +330,37 @@
 
   clearBtn.addEventListener('click', clearConsole);
 
+  let inputResolve = null;
+
+  function requestInput() {
+    return new Promise((resolve) => {
+      inputResolve = resolve;
+      userInputContainer.classList.add('active');
+      userInput.value = '';
+      userInput.focus();
+    });
+  }
+
+  function submitInput() {
+    if (!inputResolve) return;
+    const value = userInput.value;
+    userInputContainer.classList.remove('active');
+    const resolve = inputResolve;
+    inputResolve = null;
+    resolve(value);
+  }
+
+  userInputSubmit.addEventListener('click', submitInput);
+  userInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') submitInput();
+  });
+
   const Module = await createModule({
     print: (text) => writeLine(text),
     printErr: (text) => writeLine(text, '#d97757'),
   });
+
+  Module.lumenGetInput = requestInput;
 
   const origLog = console.log.bind(console);
   const origErr = console.error.bind(console);
@@ -325,9 +404,10 @@
     }
   });
 
-  runBtn.addEventListener('click', () => {
+  runBtn.addEventListener('click', async () => {
     clearConsole();
-    const rc = Module.runVM();
+    const rc = await Module.runVM();
+    userInputContainer.classList.remove('active');
     if (rc !== 0) {
       writeLine('run failed (code ' + rc + ')', '#d97757');
     }

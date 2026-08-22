@@ -16,6 +16,7 @@ target_link_options(lumen PRIVATE
     "-sENVIRONMENT=web"
     "-sFORCE_FILESYSTEM=1"
     "-sEXPORTED_RUNTIME_METHODS=FS,wasmMemory"
+    "-sASYNCIFY=1"
     "-sALLOW_MEMORY_GROWTH=0"
     "-sINITIAL_MEMORY=67108864"
     "-sEXPORTED_FUNCTIONS=['_getLmnbin','_getLmnbinSize']"

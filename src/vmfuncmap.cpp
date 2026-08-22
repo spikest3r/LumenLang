@@ -4,15 +4,37 @@
 #include <random>
 #include "httplib.h"
 
-// NOTE: assumes vm.h declares something along these lines —
-// adjust field names here if your actual struct differs.
-//
-// struct VMExecutionData {
-//     std::vector<Variant> stack;
-//     std::vector<Variant> variables;
-// };
-//
-// using NativeFn = std::function<void(VMExecutionData*)>;
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+
+// Blocks the VM (via Asyncify) until the host page resolves Module.lumenGetInput(),
+// so JS-side input can stay a real Promise instead of window.prompt's synchronous string return.
+EM_ASYNC_JS(char*, js_request_input, (), {
+    let value;
+    if (typeof Module['lumenGetInput'] === 'function') {
+        value = await Module['lumenGetInput']();
+    } else {
+        value = window.prompt('Input:') ?? '';
+    }
+    const len = lengthBytesUTF8(value) + 1;
+    const ptr = _malloc(len);
+    stringToUTF8(value, ptr, len);
+    return ptr;
+});
+
+static std::string getUserInput() {
+    char* ptr = js_request_input();
+    std::string result(ptr);
+    free(ptr);
+    return result;
+}
+#else
+static std::string getUserInput() {
+    std::string input;
+    std::cin >> input;
+    return input;
+}
+#endif
 
 std::set<std::string> capabilitySet = {
     "FS", "random", "HTTP"
@@ -44,8 +66,7 @@ std::unordered_map<int, NativeFn> funcMap = {
         auto& stack = execData->stack;
         auto& variables = execData->variables;
         auto varIndex = getInt(stack.back()); stack.pop_back();
-        std::string input;
-        std::cin >> input;
+        std::string input = getUserInput();
         int64_t result = 0;
         try {
             result = std::stoll(input);
@@ -59,8 +80,7 @@ std::unordered_map<int, NativeFn> funcMap = {
         auto& stack = execData->stack;
         auto& variables = execData->variables;
         auto varIndex = getInt(stack.back()); stack.pop_back();
-        std::string input;
-        std::cin >> input;
+        std::string input = getUserInput();
         variables[varIndex].type = TAG_STRING;
         variables[varIndex].data = input;
     }},
