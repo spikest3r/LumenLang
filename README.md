@@ -278,6 +278,7 @@ deref = *ref
 | `float2str in, &out` | Convert float to string |
 | `str2float in, &out` | Convert string to float |
 
+<<<<<<< HEAD
 ### AVR native functions
 
 | Function | Description |
@@ -297,6 +298,8 @@ deref = *ref
 | `shiftRight value, shift, &var` | Right-shift a value and store the result in a variable |
 | `or a, b, &var` | Bitwise OR of two values, stored in a variable |
 
+=======
+>>>>>>> main
 ### Capabilities
 
 Some builtins require a capability to be asserted before use. Attempting to use a gated feature without asserting its capability first raises a runtime error.
