@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/uart.h"
+#include "hardware/timer.h"
 #include <math.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 
 #define UART_ID uart1
@@ -422,21 +424,182 @@ void fn_gpioPullDown(Variant stack[16], Variant variables[16], int* sp) {
 }
 
 void fn_assertCapability(Variant stack[16], Variant variables[16], int* sp) {
-    // TODO: Implement lookup for capability support
-    // As of now, "random", "FS" and "time" are not implemented for Pico, so we set halt flag anyway
+    // As of now, only "random" is implemented as a capability on Pico; FS and HTTP
+    // are not available on this platform, so any other capability halts.
     // last value on stack is capability name
 
-    Variant* capability = &stack[*sp];  
+    Variant* capability = &stack[*sp];
     if(capability->type != TAG_STRING) {
         send_uart("assertCapability failed: invalid type\n");
         halt = 1;
         return;
     }
     (*sp)--;
+
+    if(strcmp(capability->data.str, "random") == 0) {
+        // capability present, proceed with execution
+        return;
+    }
+
     char buffer[256];
     snprintf(buffer, sizeof(buffer), "assertCapability failed: capability \'%s\' is not supported on this platform\n", capability->data.str);
     send_uart(buffer);
     halt = 1;
+}
+
+void fn_unsupportedCapability(Variant stack[16], Variant variables[16], int* sp) {
+    send_uart("Error: this function is not supported on the Pico platform\n");
+    halt = 1;
+}
+
+void fn_randomSeed(Variant stack[16], Variant variables[16], int* sp) {
+    Variant* seed = &stack[*sp];
+    (*sp)--;
+
+    srand((unsigned int)seed->data.i);
+}
+
+void fn_random(Variant stack[16], Variant variables[16], int* sp) {
+    Variant* varRef = &stack[*sp];
+    (*sp)--;
+
+    double val = (double)rand() / ((double)RAND_MAX + 1.0);
+
+    variables[varRef->data.i].type = TAG_FLOAT;
+    variables[varRef->data.i].data.f = val;
+}
+
+void fn_randomRange(Variant stack[16], Variant variables[16], int* sp) {
+    Variant* varRef = &stack[*sp];
+    (*sp)--;
+    Variant* maxArg = &stack[*sp];
+    (*sp)--;
+    Variant* minArg = &stack[*sp];
+    (*sp)--;
+
+    int32_t min = minArg->data.i;
+    int32_t max = maxArg->data.i;
+    int32_t val = min + (int32_t)(rand() % (max - min + 1)); // inclusive on both ends
+
+    variables[varRef->data.i].type = TAG_INT;
+    variables[varRef->data.i].data.i = val;
+}
+
+void fn_strlen(Variant stack[16], Variant variables[16], int* sp) {
+    Variant* varRef = &stack[*sp];
+    (*sp)--;
+    Variant* value = &stack[*sp];
+    (*sp)--;
+
+    int32_t len = (value->type == TAG_STRING) ? (int32_t)strlen(value->data.str) : 0;
+
+    variables[varRef->data.i].type = TAG_INT;
+    variables[varRef->data.i].data.i = len;
+}
+
+char buffer_substr[MAX_STRING_LEN];
+
+void fn_substr(Variant stack[16], Variant variables[16], int* sp) {
+    // substr(s, start, len, &out)
+    Variant* varRef = &stack[*sp];
+    (*sp)--;
+    Variant* lenArg = &stack[*sp];
+    (*sp)--;
+    Variant* startArg = &stack[*sp];
+    (*sp)--;
+    Variant* value = &stack[*sp];
+    (*sp)--;
+
+    memset(buffer_substr, 0, sizeof(buffer_substr));
+
+    if(value->type == TAG_STRING) {
+        int32_t strLen = (int32_t)strlen(value->data.str);
+        int32_t start = startArg->data.i;
+        int32_t len = lenArg->data.i;
+
+        if(start >= 0 && start < strLen) {
+            int32_t maxLen = strLen - start;
+            if(len > maxLen) len = maxLen;
+            if(len > (int32_t)sizeof(buffer_substr) - 1) len = sizeof(buffer_substr) - 1;
+            if(len > 0) memcpy(buffer_substr, value->data.str + start, len);
+        }
+    }
+
+    variables[varRef->data.i].type = TAG_STRING;
+    variables[varRef->data.i].data.str = buffer_substr;
+}
+
+void fn_strfind(Variant stack[16], Variant variables[16], int* sp) {
+    // strfind(s, needle, &index)
+    Variant* varRef = &stack[*sp];
+    (*sp)--;
+    Variant* needleVal = &stack[*sp];
+    (*sp)--;
+    Variant* strVal = &stack[*sp];
+    (*sp)--;
+
+    int32_t result = -1;
+    if(strVal->type == TAG_STRING && needleVal->type == TAG_STRING) {
+        char* found = strstr(strVal->data.str, needleVal->data.str);
+        if(found) result = (int32_t)(found - strVal->data.str);
+    }
+
+    variables[varRef->data.i].type = TAG_INT;
+    variables[varRef->data.i].data.i = result;
+}
+
+char buffer_toCase[MAX_STRING_LEN];
+
+void fn_toCase(Variant stack[16], Variant variables[16], int* sp) {
+    // toUpper(s, &out) / toLower(s, &out) via a flag arg (0=lower, 1=upper)
+    Variant* varRef = &stack[*sp];
+    (*sp)--;
+    Variant* upperFlag = &stack[*sp];
+    (*sp)--;
+    Variant* value = &stack[*sp];
+    (*sp)--;
+
+    memset(buffer_toCase, 0, sizeof(buffer_toCase));
+
+    if(value->type == TAG_STRING) {
+        size_t len = strlen(value->data.str);
+        if(len > sizeof(buffer_toCase) - 1) len = sizeof(buffer_toCase) - 1;
+        for(size_t i = 0; i < len; i++) {
+            unsigned char c = (unsigned char)value->data.str[i];
+            buffer_toCase[i] = upperFlag->data.i ? (char)toupper(c) : (char)tolower(c);
+        }
+    }
+
+    variables[varRef->data.i].type = TAG_STRING;
+    variables[varRef->data.i].data.str = buffer_toCase;
+}
+
+char buffer_trim[MAX_STRING_LEN];
+
+void fn_trim(Variant stack[16], Variant variables[16], int* sp) {
+    // trim(s, &out)
+    Variant* varRef = &stack[*sp];
+    (*sp)--;
+    Variant* value = &stack[*sp];
+    (*sp)--;
+
+    memset(buffer_trim, 0, sizeof(buffer_trim));
+
+    if(value->type == TAG_STRING) {
+        const char* ws = " \t\n\r\f\v";
+        const char* str = value->data.str;
+        size_t len = strlen(str);
+        size_t start = strspn(str, ws);
+        size_t end = len;
+        while(end > start && strchr(ws, str[end - 1])) end--;
+
+        size_t copyLen = (start < end) ? (end - start) : 0;
+        if(copyLen > sizeof(buffer_trim) - 1) copyLen = sizeof(buffer_trim) - 1;
+        if(copyLen > 0) memcpy(buffer_trim, str + start, copyLen);
+    }
+
+    variables[varRef->data.i].type = TAG_STRING;
+    variables[varRef->data.i].data.str = buffer_trim;
 }
 
 
@@ -467,8 +630,20 @@ NativeFn customFuncTable[] = {
 #define CUSTOM_FUNC_COUNT (sizeof(customFuncTable) / sizeof(customFuncTable[0]))
 
 NativeFn capabilityFuncTable[] = {
-    fn_assertCapability // 0xA0
-    // rest are handled by EXEC as halt stubs
+    fn_assertCapability,        // 0xA0
+    fn_unsupportedCapability,   // 0xA1 openFile (no filesystem on Pico)
+    fn_unsupportedCapability,   // 0xA2 writeFile
+    fn_unsupportedCapability,   // 0xA3 readFile
+    fn_unsupportedCapability,   // 0xA4 closeFile
+    fn_randomSeed,              // 0xA5
+    fn_random,                  // 0xA6
+    fn_randomRange,             // 0xA7
+    fn_unsupportedCapability,   // 0xA8 httpRequest (no network stack on Pico)
+    fn_strlen,                  // 0xA9
+    fn_substr,                  // 0xAA
+    fn_strfind,                 // 0xAB
+    fn_toCase,                  // 0xAC
+    fn_trim,                    // 0xAD
 };
 
 #define CAPABILITY_FUNC_COUNT (sizeof(capabilityFuncTable) / sizeof(capabilityFuncTable[0]))
@@ -484,9 +659,11 @@ int execute(
     Variant variables[16];
     Variant stack[16];
     int pcStack[8];
+    int routineBaseStack[8];
     int stackPointer = -1;
     int pcStackPointer = -1;
     int PC = 0;
+    int routineBase = 0;
 
     while(1) {
         int opcode = bytecode[PC];
@@ -494,13 +671,21 @@ int execute(
         switch(opcode) {
             case 0x01: {
                 int addr = bytecode[PC + 1];
-                pcStack[++pcStackPointer] = PC + offset;
+                pcStackPointer++;
+                pcStack[pcStackPointer] = PC + offset;
+                routineBaseStack[pcStackPointer] = routineBase;
+                routineBase = addr;
                 PC = addr;
                 continue;
             }
             case 0xFE: {
-                if(pcStackPointer < 0) return -1;
-                PC = pcStack[pcStackPointer--];
+                if(pcStackPointer < 0) {
+                    send_uart("Return stack underflow!\n");
+                    return -1;
+                }
+                PC = pcStack[pcStackPointer];
+                routineBase = routineBaseStack[pcStackPointer];
+                pcStackPointer--;
                 continue;
             }
             case 0x02: {
@@ -592,21 +777,30 @@ int execute(
                 break;
             }
             case 0x05: {
-                PC = bytecode[PC + 1];
+                PC = routineBase + bytecode[PC + 1];
                 continue;
             }
             case 0x06: { // JUMP32
                 uint32_t addr = readU32FromBytecode(bytecode, PC + 1);
-                PC = (int)addr;
+                PC = routineBase + (int)addr;
                 continue;
             }
             case 0x07: { // CALL32
                 uint32_t addr = readU32FromBytecode(bytecode, PC + 1);
-                pcStack[++pcStackPointer] = PC + offset;
+                pcStackPointer++;
+                pcStack[pcStackPointer] = PC + offset;
+                routineBaseStack[pcStackPointer] = routineBase;
+                routineBase = (int)addr;
                 PC = (int)addr;
                 continue;
             }
             case 0xA0: { // ADD
+                if(stackPointer < 1) {
+                    stackPointer++;
+                    stack[stackPointer].type = TAG_INT;
+                    stack[stackPointer].data.i = 0;
+                    break;
+                }
                 Variant b = stack[stackPointer]; stackPointer--;
                 Variant a = stack[stackPointer]; stackPointer--;
                 stackPointer++;
@@ -621,6 +815,12 @@ int execute(
                 break;
             }
             case 0xA1: { // SUB
+                if(stackPointer < 1) {
+                    stackPointer++;
+                    stack[stackPointer].type = TAG_INT;
+                    stack[stackPointer].data.i = 0;
+                    break;
+                }
                 Variant b = stack[stackPointer]; stackPointer--;
                 Variant a = stack[stackPointer]; stackPointer--;
                 stackPointer++;
@@ -635,6 +835,12 @@ int execute(
                 break;
             }
             case 0xA2: { // MUL
+                if(stackPointer < 1) {
+                    stackPointer++;
+                    stack[stackPointer].type = TAG_INT;
+                    stack[stackPointer].data.i = 0;
+                    break;
+                }
                 Variant b = stack[stackPointer]; stackPointer--;
                 Variant a = stack[stackPointer]; stackPointer--;
                 stackPointer++;
@@ -649,6 +855,12 @@ int execute(
                 break;
             }
             case 0xA3: { // DIV
+                if(stackPointer < 1) {
+                    stackPointer++;
+                    stack[stackPointer].type = TAG_INT;
+                    stack[stackPointer].data.i = 0;
+                    break;
+                }
                 Variant b = stack[stackPointer]; stackPointer--;
                 Variant a = stack[stackPointer]; stackPointer--;
                 stackPointer++;
@@ -658,6 +870,12 @@ int execute(
                 break;
             }
             case 0xA4: { // POW
+                if(stackPointer < 1) {
+                    stackPointer++;
+                    stack[stackPointer].type = TAG_INT;
+                    stack[stackPointer].data.i = 0;
+                    break;
+                }
                 Variant b = stack[stackPointer]; stackPointer--;
                 Variant a = stack[stackPointer]; stackPointer--;
                 stackPointer++;
@@ -672,6 +890,12 @@ int execute(
                 break;
             }
             case 0xA5: { // MOD
+                if(stackPointer < 1) {
+                    stackPointer++;
+                    stack[stackPointer].type = TAG_INT;
+                    stack[stackPointer].data.i = 0;
+                    break;
+                }
                 Variant b = stack[stackPointer]; stackPointer--;
                 Variant a = stack[stackPointer]; stackPointer--;
                 stackPointer++;
@@ -691,8 +915,14 @@ int execute(
             case 0xB3:
             case 0xB4:
             case 0xB5: {
-                Variant b = stack[stackPointer]; stackPointer--;
-                Variant a = stack[stackPointer]; stackPointer--;
+                Variant a, b;
+                if(stackPointer < 1) {
+                    a.type = TAG_INT; a.data.i = (int32_t)0xFEEDFACE;
+                    b.type = TAG_INT; b.data.i = (int32_t)0xDEADBEEF;
+                } else {
+                    b = stack[stackPointer]; stackPointer--;
+                    a = stack[stackPointer]; stackPointer--;
+                }
                 int falseIndex = bytecode[PC + 1];
 
                 double av = getNumeric(&a);
@@ -707,7 +937,7 @@ int execute(
                     case 0xB5: result = av != bv; break;
                 }
                 if(!result) {
-                    PC = falseIndex;
+                    PC = routineBase + falseIndex;
                     continue;
                 }
                 break;
@@ -734,7 +964,7 @@ int execute(
                     case 0xC5: result = av != bv; break;
                 }
                 if(!result) {
-                    PC = (int)falseIndex;
+                    PC = routineBase + (int)falseIndex;
                     continue;
                 }
                 break;
@@ -806,6 +1036,8 @@ int main() {
     uart_init(UART_ID, BAUD_RATE);
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+
+    srand(time_us_32());
 
     send_uart("Loading...\n");
 
