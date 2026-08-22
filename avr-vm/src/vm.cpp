@@ -83,7 +83,10 @@ int execute(
         }
       case 0xFE:
         {
-          if (pcStackPointer < 0) return -1;
+          if (pcStackPointer < 0) {
+            send_uart("Return stack underflow!\n");
+            return -1;
+          }
           CallFrame frame = pcStack[pcStackPointer--];
           routineBase = frame.routineBase;
           PC = frame.returnPC;
@@ -202,7 +205,13 @@ int execute(
           continue;
         }
       case 0xA0:
-        {  
+        {
+          if (stackPointer < 1) {
+            stackPointer++;
+            stack[stackPointer].type = TAG_INT;
+            stack[stackPointer].data.i = 0;
+            break;
+          }
           Variant b = stack[stackPointer];
           stackPointer--;
           Variant a = stack[stackPointer];
@@ -219,7 +228,13 @@ int execute(
           break;
         }
       case 0xA1:
-        {  
+        {
+          if (stackPointer < 1) {
+            stackPointer++;
+            stack[stackPointer].type = TAG_INT;
+            stack[stackPointer].data.i = 0;
+            break;
+          }
           Variant b = stack[stackPointer];
           stackPointer--;
           Variant a = stack[stackPointer];
@@ -236,7 +251,13 @@ int execute(
           break;
         }
       case 0xA2:
-        {  
+        {
+          if (stackPointer < 1) {
+            stackPointer++;
+            stack[stackPointer].type = TAG_INT;
+            stack[stackPointer].data.i = 0;
+            break;
+          }
           Variant b = stack[stackPointer];
           stackPointer--;
           Variant a = stack[stackPointer];
@@ -253,7 +274,13 @@ int execute(
           break;
         }
       case 0xA3:
-        {  
+        {
+          if (stackPointer < 1) {
+            stackPointer++;
+            stack[stackPointer].type = TAG_INT;
+            stack[stackPointer].data.i = 0;
+            break;
+          }
           Variant b = stack[stackPointer];
           stackPointer--;
           Variant a = stack[stackPointer];
@@ -265,7 +292,13 @@ int execute(
           break;
         }
       case 0xA4:
-        {  
+        {
+          if (stackPointer < 1) {
+            stackPointer++;
+            stack[stackPointer].type = TAG_INT;
+            stack[stackPointer].data.i = 0;
+            break;
+          }
           Variant b = stack[stackPointer];
           stackPointer--;
           Variant a = stack[stackPointer];
@@ -282,7 +315,13 @@ int execute(
           break;
         }
       case 0xA5:
-        {  
+        {
+          if (stackPointer < 1) {
+            stackPointer++;
+            stack[stackPointer].type = TAG_INT;
+            stack[stackPointer].data.i = 0;
+            break;
+          }
           Variant b = stack[stackPointer];
           stackPointer--;
           Variant a = stack[stackPointer];
@@ -305,10 +344,16 @@ int execute(
       case 0xB4:
       case 0xB5:
         {
-          Variant b = stack[stackPointer];
-          stackPointer--;
-          Variant a = stack[stackPointer];
-          stackPointer--;
+          Variant a, b;
+          if (stackPointer < 1) {
+            a.type = TAG_INT; a.data.i = (int32_t)0xFEEDFACE;
+            b.type = TAG_INT; b.data.i = (int32_t)0xDEADBEEF;
+          } else {
+            b = stack[stackPointer];
+            stackPointer--;
+            a = stack[stackPointer];
+            stackPointer--;
+          }
           int falseIndex = bytecode[PC + 1];
 
           float av = getNumeric(&a);
