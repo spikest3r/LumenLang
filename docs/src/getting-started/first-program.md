@@ -63,8 +63,8 @@ lumen --examples fizzbuzz
 ```
 
 ```
-✨ Created 'fizzbuzz.lmn'!
-👉 Run it with: lumen fizzbuzz.lmn
+Created 'fizzbuzz.lmn'!
+Run it with: lumen fizzbuzz.lmn
 ```
 
 And run it:
