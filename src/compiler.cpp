@@ -5,6 +5,11 @@ struct Function {
     uint8_t argCount;
 };
 
+struct Function {
+    uint8_t opcode;
+    uint8_t argCount;
+};
+
 inline void emitUint32(std::vector<uint8_t>& bytecode, uint32_t value) {
     bytecode.push_back(value & 0xFF);
     bytecode.push_back((value >> 8) & 0xFF);
@@ -35,6 +40,7 @@ static const std::unordered_map<std::string, ConditionOp> condOpMap = {
     {"!=", NOT_EQUALS}
 };
 
+static const std::unordered_map<ConditionOp, uint8_t> condOpcodeMap = {
 static const std::unordered_map<ConditionOp, uint8_t> condOpcodeMap = {
     {EQUALS,        0xC0},
     {GREATER,       0xC1},
@@ -151,6 +157,9 @@ int compile(std::string fileName,
     int funcArgs = 0;
     int requiredFuncArgs = 0;
 
+    int funcArgs = 0;
+    int requiredFuncArgs = 0;
+
     while (std::getline(file, line)) {
         if (verbose) std::cout << line << std::endl;
         auto tokens = tokenizeFormula(line);
@@ -177,9 +186,14 @@ int compile(std::string fileName,
                     formula += tokens[i];
                 }
 
-                compileExpression(
-                    formula, compilerData, bytecode
-                ); // result in stack
+                try {
+                    compileExpression(
+                        formula, compilerData, bytecode
+                    ); // result in stack
+                } catch (const std::exception& e) {
+                    printError(e.what(), lineIndex);
+                    return -1;
+                }
                 
                 bytecode.push_back(0x02);
                 keyword = tokens[0];
@@ -308,6 +322,9 @@ int compile(std::string fileName,
                         funcIndex = it->second.opcode;
                         funcArgs = 0;
                         requiredFuncArgs = it->second.argCount;
+                    } else if(tokens[1] != "=") {
+                        printError("Unknown function: " + token, lineIndex);
+                        return -1;
                     }
                     continue;
                 }
@@ -327,12 +344,8 @@ int compile(std::string fileName,
             //case PUSH_STACK:
             {
                 if (token == ",") {
-                    compileExpression(
-                        functionArgument, compilerData, bytecode
-                    ); // result in stack
-                    funcArgs++;
-                    functionArgument.clear();
-                    break;
+                    printError("Syntax error", lineIndex);
+                    return -1;
                 }
                 functionArgument += token;
             }
@@ -410,11 +423,18 @@ int compile(std::string fileName,
 
         switch (op) {
         case FUNC_CALL:
-            compileExpression(
-                functionArgument, compilerData, bytecode
-            ); // result in stack
-            funcArgs++;
-            functionArgument.clear();
+            if(!functionArgument.empty()) {
+                try {
+                    compileExpression(
+                        functionArgument, compilerData, bytecode
+                    ); // result in stack
+                } catch (const std::exception& e) {
+                    printError(e.what(), lineIndex);
+                    return -1;
+                }
+                funcArgs++;
+                functionArgument.clear();
+            }
 
             if(funcArgs != requiredFuncArgs) {
                 auto it = std::find_if(funcList.begin(), funcList.end(),

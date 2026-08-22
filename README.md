@@ -35,8 +35,17 @@ Hello, Ryan!
 - Labels and jumps
 - User-defined routines
 - References and dereferencing
+- References and dereferencing
 - Console input/output
 - Comments
+
+### Standard Library
+
+- File I/O (open, read, write, close)
+- Random number generation
+- HTTP requests (GET, POST, PUT, DELETE)
+- Capability-gated access to sensitive builtins
+- String inspection and manipulation
 
 ### Standard Library
 

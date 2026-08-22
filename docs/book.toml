@@ -1,0 +1,32 @@
+[book]
+title = "The Lumen Book"
+authors = ["Oleh Sheremeta"]
+description = "The official guide to LumenLang — a lightweight, stack-based scripting language with a custom compiler, bytecode format, and virtual machine written in C++20."
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/spikest3r/LumenLang"
+edit-url-template = "https://github.com/spikest3r/LumenLang/edit/main/book/{path}"
+site-url = "/"
+mathjax-support = false
+
+[output.html.search]
+enable = true
+limit-results = 15
+use-boolean-and = true
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.playground]
+editable = false
+copyable = true
+line-numbers = true
