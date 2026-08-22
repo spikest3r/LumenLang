@@ -46,8 +46,20 @@ NativeFn customFuncTable[] = {
 #define CUSTOM_FUNC_COUNT (sizeof(customFuncTable) / sizeof(customFuncTable[0]))
 
 NativeFn capabilityFuncTable[] = {
-    fn_assertCapability // 0xA0
-    // rest are handled by EXEC as halt stubs
+    fn_assertCapability,        // 0xA0
+    fn_unsupportedCapability,   // 0xA1 openFile (requires a filesystem, unsupported on this platform)
+    fn_unsupportedCapability,   // 0xA2 writeFile (requires a filesystem, unsupported on this platform)
+    fn_unsupportedCapability,   // 0xA3 readFile (requires a filesystem, unsupported on this platform)
+    fn_unsupportedCapability,   // 0xA4 closeFile (requires a filesystem, unsupported on this platform)
+    fn_randomSeed,              // 0xA5
+    fn_random,                  // 0xA6
+    fn_randomRange,             // 0xA7
+    fn_unsupportedCapability,   // 0xA8 httpRequest (requires networking, unsupported on this platform)
+    fn_strlen,                  // 0xA9
+    fn_substr,                  // 0xAA
+    fn_strfind,                 // 0xAB
+    fn_strcase,                 // 0xAC
+    fn_trim                     // 0xAD
 };
 
 #define CAPABILITY_FUNC_COUNT (sizeof(capabilityFuncTable) / sizeof(capabilityFuncTable[0]))
