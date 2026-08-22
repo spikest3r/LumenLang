@@ -18,7 +18,8 @@ int64_t getInt(const Variant& v) {
 
 double getNumeric(const Variant& v) {
     if (v.type == TAG_FLOAT) return std::get<double>(v.data);
-    return static_cast<double>(std::get<int64_t>(v.data));
+    if (v.type == TAG_INT) return static_cast<double>(std::get<int64_t>(v.data));
+    return 0.0;
 }
 
 bool isFloatVariant(const Variant& a, const Variant& b) {
@@ -46,6 +47,7 @@ int run(
     }
     return 0;
 }
+
 
 int execute(
     VMProgramData* progData,
@@ -138,7 +140,7 @@ int execute(
         auto it = funcMap.find(functionIndex);
         if (it != funcMap.end()) {
             try {
-                it->second(execData->stack, execData->variables);
+                it->second(execData);
             } catch(std::exception& s) {
                 std::cerr << "Function error\n" << s.what() << std::endl;
                 execData->halt = true;
@@ -180,6 +182,10 @@ int execute(
     }
     break;
     case 0xA0: { // ADD
+        if(execData->stack.size() < 2) {
+            execData->stack.push_back({TAG_INT, 0});
+            break;
+        }
         Variant b = execData->stack.back(); execData->stack.pop_back();
         Variant a = execData->stack.back(); execData->stack.pop_back();
         Variant result;
@@ -195,6 +201,10 @@ int execute(
         break;
     }
     case 0xA1: { // SUB
+        if(execData->stack.size() < 2) {
+            execData->stack.push_back({TAG_INT, 0});
+            break;
+        }
         Variant b = execData->stack.back(); execData->stack.pop_back();
         Variant a = execData->stack.back(); execData->stack.pop_back();
         Variant result;
@@ -210,6 +220,10 @@ int execute(
         break;
     }
     case 0xA2: { // MUL
+        if(execData->stack.size() < 2) {
+            execData->stack.push_back({TAG_INT, 0});
+            break;
+        }
         Variant b = execData->stack.back(); execData->stack.pop_back();
         Variant a = execData->stack.back(); execData->stack.pop_back();
         Variant result;
@@ -225,6 +239,10 @@ int execute(
         break;
     }
     case 0xA3: { // DIV
+        if(execData->stack.size() < 2) {
+            execData->stack.push_back({TAG_INT, 0});
+            break;
+        }
         Variant b = execData->stack.back(); execData->stack.pop_back();
         Variant a = execData->stack.back(); execData->stack.pop_back();
         Variant result;
@@ -234,6 +252,10 @@ int execute(
         break;
     }
     case 0xA4: { // POW
+        if(execData->stack.size() < 2) {
+            execData->stack.push_back({TAG_INT, 0});
+            break;
+        }
         Variant b = execData->stack.back(); execData->stack.pop_back();
         Variant a = execData->stack.back(); execData->stack.pop_back();
         Variant result;
@@ -249,6 +271,10 @@ int execute(
         break;
     }
     case 0xA5: { // MOD
+        if(execData->stack.size() < 2) {
+            execData->stack.push_back({TAG_INT, 0});
+            break;
+        }
         Variant b = execData->stack.back(); execData->stack.pop_back();
         Variant a = execData->stack.back(); execData->stack.pop_back();
         Variant result;
@@ -270,8 +296,14 @@ int execute(
     case 0xB4: // <=
     case 0xB5: // != 
     {
-        Variant b = execData->stack.back(); execData->stack.pop_back();
-        Variant a = execData->stack.back(); execData->stack.pop_back();
+        Variant a, b;
+        if(execData->stack.size() < 2) {
+            a = {TAG_INT, 0xFEEDFACE};
+            b = {TAG_INT, 0xDEADBEEF};
+        } else {
+            b = execData->stack.back(); execData->stack.pop_back();
+            a = execData->stack.back(); execData->stack.pop_back();
+        }
         int falseIndex = progData->bytecode[execData->PC + 1];
 
         bool result = false;

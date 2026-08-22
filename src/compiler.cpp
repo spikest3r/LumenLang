@@ -159,9 +159,14 @@ int compile(std::string fileName,
                     formula += tokens[i];
                 }
 
-                compileExpression(
-                    formula, compilerData, bytecode
-                ); // result in stack
+                try {
+                    compileExpression(
+                        formula, compilerData, bytecode
+                    ); // result in stack
+                } catch (const std::exception& e) {
+                    printError(e.what(), lineIndex);
+                    return -1;
+                }
                 
                 bytecode.push_back(0x02);
                 keyword = tokens[0];
@@ -290,6 +295,9 @@ int compile(std::string fileName,
                         funcIndex = it->second.opcode;
                         funcArgs = 0;
                         requiredFuncArgs = it->second.argCount;
+                    } else if(tokens[1] != "=") {
+                        printError("Unknown function: " + token, lineIndex);
+                        return -1;
                     }
                     continue;
                 }
@@ -309,9 +317,14 @@ int compile(std::string fileName,
             //case PUSH_STACK:
             {
                 if (token == ",") {
-                    compileExpression(
-                        functionArgument, compilerData, bytecode
-                    ); // result in stack
+                    try {
+                        compileExpression(
+                            functionArgument, compilerData, bytecode
+                        ); // result in stack
+                    } catch (const std::exception& e) {
+                        printError(e.what(), lineIndex);
+                        return -1;
+                    }
                     funcArgs++;
                     functionArgument.clear();
                     break;
@@ -392,11 +405,18 @@ int compile(std::string fileName,
 
         switch (op) {
         case FUNC_CALL:
-            compileExpression(
-                functionArgument, compilerData, bytecode
-            ); // result in stack
-            funcArgs++;
-            functionArgument.clear();
+            if(!functionArgument.empty()) {
+                try {
+                    compileExpression(
+                        functionArgument, compilerData, bytecode
+                    ); // result in stack
+                } catch (const std::exception& e) {
+                    printError(e.what(), lineIndex);
+                    return -1;
+                }
+                funcArgs++;
+                functionArgument.clear();
+            }
 
             if(funcArgs != requiredFuncArgs) {
                 auto it = std::find_if(funcList.begin(), funcList.end(),
