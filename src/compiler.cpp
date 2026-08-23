@@ -5,6 +5,16 @@ struct Function {
     uint8_t argCount;
 };
 
+enum class BlockType {
+    IF,
+    WHILE
+};
+
+struct LoopJumpData {
+    int locStart;
+    int locIf;
+};
+
 inline void emitUint32(std::vector<uint8_t>& bytecode, uint32_t value) {
     bytecode.push_back(value & 0xFF);
     bytecode.push_back((value >> 8) & 0xFF);
@@ -122,8 +132,11 @@ int compile(std::string fileName,
 
     std::string functionArgument = "";
 
-    int blockDepth = 0;
+    // int blockDepth = 0;
+    std::vector<BlockType> blockDepth;
     std::vector<bool> elseDefined;
+
+    std::vector<LoopJumpData> loopCondJumpStack;
 
     int lineIndex = 1; // for user messages
     bool inRoutine = false;
@@ -197,18 +210,18 @@ int compile(std::string fileName,
                     return -1;
                 }
                 op = IF;
-                blockDepth++;
+                blockDepth.push_back(BlockType::IF);
                 elseDefined.push_back(false);
                 condJumpStack.push_back(-1);
                 elseJumpStack.push_back({-1});
                 continue;
             }
             else if (token == "endif") {
-                if (blockDepth == 0) {
+                if (blockDepth.back() != BlockType::IF) {
                     printError("Unexpected 'endif' (no matching 'if')", lineIndex);
                     return -1;
                 }
-                if (elseDefined[blockDepth - 1]) {
+                if (elseDefined[blockDepth.size() - 1]) {
                     auto toPatch = elseJumpStack.back();
                     for (auto loc : toPatch) {
                         patchUint32(bytecode, loc, static_cast<uint32_t>(bytecode.size()));
@@ -220,16 +233,16 @@ int compile(std::string fileName,
                 }
                 condJumpStack.pop_back();
                 elseJumpStack.pop_back();
-                blockDepth--;
+                blockDepth.pop_back();
                 elseDefined.pop_back();
                 continue;
             }
             else if (token == "else") {
-                if (blockDepth == 0) {
+                if (blockDepth.size() == 0 || blockDepth.back() != BlockType::IF) {
                     printError("Unexpected 'else' (no matching 'if')", lineIndex);
                     return -1;
                 }
-                elseDefined[blockDepth - 1] = true;
+                elseDefined[blockDepth.size() - 1] = true;
                 int loc = condJumpStack.back();
 
                 // Patch false-jump location to skip the upcoming 5-byte 'JUMP32 target' instruction (1 byte opcode + 4 bytes uint32)
@@ -241,11 +254,11 @@ int compile(std::string fileName,
                 continue;
             } else if(token == "elif") {
                 // else
-                if (blockDepth == 0) {
-                    printError("Unexpected 'else' (no matching 'if')", lineIndex);
+                if (blockDepth.size() == 0 || blockDepth.back() != BlockType::IF) {
+                    printError("Unexpected 'elif' (no matching 'if')", lineIndex);
                     return -1;
                 }
-                elseDefined[blockDepth - 1] = true;
+                elseDefined[blockDepth.size() - 1] = true;
                 int loc = condJumpStack.back();
 
                 // Patch false-jump location to skip the upcoming 5-byte 'JUMP32 target' instruction (1 byte opcode + 4 bytes uint32)
@@ -262,12 +275,37 @@ int compile(std::string fileName,
 
                 continue;
             }
+            else if (token == "while") {
+                if (op != NONE) {
+                    printError("Syntax error", lineIndex);
+                    return -1;
+                }
+                op = WHILE;
+                blockDepth.push_back(BlockType::WHILE);
+                loopCondJumpStack.push_back(LoopJumpData {static_cast<int>(bytecode.size()), -1});
+                continue;
+            }
+            else if (token == "endwhile") {
+                if (blockDepth.size() == 0 || blockDepth.back() != BlockType::WHILE) {
+                    printError("Unexpected 'endwhile' (no matching 'while')", lineIndex);
+                    return -1;
+                }
+                auto loopData = loopCondJumpStack.back();
+                bytecode.push_back(0x06);
+                emitUint32(bytecode, static_cast<uint32_t>(loopData.locStart));
+                int loc = loopData.locIf;
+                patchUint32(bytecode, loc, static_cast<uint32_t>(bytecode.size()));
+                loopCondJumpStack.pop_back();
+                blockDepth.pop_back();
+                continue;
+            }
             else if (token == "halt") {
                 if (op != NONE) {
                     printError("Syntax error", lineIndex);
                     return -1;
                 }
                 bytecode.push_back(0xFF);
+                
                 continue;
             }
             else if (token == "routine") {
@@ -402,6 +440,7 @@ int compile(std::string fileName,
                 op = NONE;
             }
             break;
+            case WHILE:
             case IF:
             {
                 auto it = condOpMap.find(keyword);
@@ -455,6 +494,7 @@ int compile(std::string fileName,
             bytecode.push_back(0x04); // call function
             bytecode.push_back(funcIndex);
             break;
+        case WHILE:
         case IF:
         {
             auto it = condOpcodeMap.find(condOp);
@@ -466,7 +506,14 @@ int compile(std::string fileName,
                 bytecode.push_back(it->second); // IF32 opcode
                 int loc = static_cast<int>(bytecode.size());
                 emitUint32(bytecode, 0x00000000);
-                condJumpStack.back() = loc;
+                switch (op) {
+                case IF:
+                    condJumpStack.back() = loc;
+                    break;
+                case WHILE:
+                    loopCondJumpStack.back().locIf = loc;
+                    break;
+                }
             }
             else {
                 printError("Syntax error", lineIndex);

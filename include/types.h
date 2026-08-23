@@ -42,7 +42,8 @@ typedef enum {
     LABEL,
     JUMP,
     IF, ELSE,
-    SUBROUTINE
+    SUBROUTINE,
+    WHILE
 } Operation;
 
 typedef enum {
