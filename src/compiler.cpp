@@ -118,7 +118,7 @@ int compile(std::string fileName,
     std::vector<UnresolvedJump> unresolvedRoutineCalls;
     std::vector<UnresolvedJump> unresolvedJumps;
     std::vector<int> condJumpStack;
-    std::vector<int> elseJumpStack;
+    std::vector<std::vector<int>> elseJumpStack;
 
     std::string functionArgument = "";
 
@@ -200,7 +200,7 @@ int compile(std::string fileName,
                 blockDepth++;
                 elseDefined.push_back(false);
                 condJumpStack.push_back(-1);
-                elseJumpStack.push_back(-1);
+                elseJumpStack.push_back({-1});
                 continue;
             }
             else if (token == "endif") {
@@ -209,8 +209,10 @@ int compile(std::string fileName,
                     return -1;
                 }
                 if (elseDefined[blockDepth - 1]) {
-                    int loc = elseJumpStack.back();
-                    patchUint32(bytecode, loc, static_cast<uint32_t>(bytecode.size()));
+                    auto toPatch = elseJumpStack.back();
+                    for (auto loc : toPatch) {
+                        patchUint32(bytecode, loc, static_cast<uint32_t>(bytecode.size()));
+                    }
                 }
                 else {
                     int loc = condJumpStack.back();
@@ -235,7 +237,29 @@ int compile(std::string fileName,
 
                 bytecode.push_back(0x06); // JUMP32
                 emitUint32(bytecode, 0x00000000);
-                elseJumpStack.back() = static_cast<int>(bytecode.size() - 4); // Track location of jump target
+                elseJumpStack.back().back() = static_cast<int>(bytecode.size() - 4); // Track location of jump target
+                continue;
+            } else if(token == "elif") {
+                // else
+                if (blockDepth == 0) {
+                    printError("Unexpected 'else' (no matching 'if')", lineIndex);
+                    return -1;
+                }
+                elseDefined[blockDepth - 1] = true;
+                int loc = condJumpStack.back();
+
+                // Patch false-jump location to skip the upcoming 5-byte 'JUMP32 target' instruction (1 byte opcode + 4 bytes uint32)
+                patchUint32(bytecode, loc, static_cast<uint32_t>(bytecode.size() + 5));
+
+                bytecode.push_back(0x06); // JUMP32
+                emitUint32(bytecode, 0x00000000);
+                elseJumpStack.back().back() = static_cast<int>(bytecode.size() - 4); // Track location of jump target
+
+                // if
+                condJumpStack.push_back(-1);
+                elseJumpStack.back().push_back(-1);
+                op = IF;
+
                 continue;
             }
             else if (token == "halt") {
