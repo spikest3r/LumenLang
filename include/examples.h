@@ -6,41 +6,20 @@ struct Example {
     std::string fileName;
 };
 
-std::string fizzbuzz = R"(N = 0
-
-print 'N='
-inputInt &N
-println ''
-
-i = 1
-
-label loop
-
-i15 = i % 15
-
-if i15 == 0
-    println 'FizzBuzz'
+std::string fizzbuzz = R"(print 'N='
+inputInt &x
+repeat x, n
+n = n + 1
+if n % 15 == 0
+println 'FizzBuzz'
+elif n % 5 == 0
+println 'Buzz'
+elif n % 3 == 0
+println 'Fizz'
 else
-    i3 = i % 3
-
-    if i3 == 0
-        println 'Fizz'
-    else
-        i5 = i % 5
-
-        if i5 == 0
-            println 'Buzz'
-        else
-            println i
-        endif
-    endif
+println n
 endif
-
-i = i + 1
-
-if i <= N
-    jump loop
-endif
+endrepeat
 )";
 
 std::string temperature = R"(temp = 0
@@ -74,8 +53,7 @@ call ask
 inputInt &temp
 call c2f
 call show
-else
-if mode == 2
+elif mode == 2
 call ask
 inputInt &temp
 call f2c
