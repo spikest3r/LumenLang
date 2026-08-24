@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
             std::cout << "Pico examples: \n";
             std::cout << "  blinky            Blink on-board LED in oscillating pattern\n";
             std::cout << "  buttons           Toggle on-board LED by pressing button (GPIO 2)\n";
-            std::cout << "Desktop examples work on Raspberry Pi Pico as well!\n\n";
+            std::cout << "Desktop examples work on embedded platforms as well!\n\n";
             std::cout << "Generate an example:\n";
             std::cout << "  lumen --examples <name>\n\n";
             std::cout << "Example:\n";
@@ -83,7 +83,6 @@ int main(int argc, char** argv) {
         std::cout << "  --disassemble            Disassemble the compiled bytecode" << std::endl;
         std::cout << "  --dbgsym                 Generate debug symbols information file" << std::endl;
         std::cout << "  --debugger               Run file in debugger mode" << std::endl;
-        std::cout << "  --pico                   Compile with Rapsberry Pi Pico functions" << std::endl;
         std::cout << "If no options are provided, the program will compile and run the source file." << std::endl;
         return 0;
     } else if(file_name == "--version") {
@@ -105,7 +104,6 @@ int main(int argc, char** argv) {
     bool disassembleFlag = false;
     bool debugInfo = false;
     bool debuggerActive = false;
-    bool picoFlag = false;
 
     if(argc > 2) {
         for(int i = 2; i < argc; i++) {
@@ -115,7 +113,6 @@ int main(int argc, char** argv) {
             else if(strcmp(arg, "--disassemble") == 0) disassembleFlag = true;
             else if(strcmp(arg, "--run") == 0) runFlag = true;
             else if(strcmp(arg, "--debug") == 0) debugInfo = true;
-            else if(strcmp(arg, "--pico") == 0) picoFlag = true;
             else if(strcmp(arg, "--dbgsym") == 0) debugInfo = true;
             else if(strcmp(arg, "--debugger") == 0) debuggerActive = true;
             else {
@@ -153,7 +150,7 @@ int main(int argc, char** argv) {
         CompilerData data;
 
         int status = compile(
-            file_name, &data, verboseFlag, debugInfo, picoFlag
+            file_name, &data, verboseFlag, debugInfo
         );
 
         if(status != 0) {
