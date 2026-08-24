@@ -29,8 +29,7 @@ call ask
 inputInt &temp
 call c2f
 call show
-else
-if mode == 2
+elif mode == 2
 call ask
 inputInt &temp
 call f2c
