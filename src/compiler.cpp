@@ -112,7 +112,7 @@ void pushToStack(std::string token, CompilerData* data, std::vector<uint8_t>& by
 
 int compileFromStream(std::istream& input,
     CompilerData* compilerData,
-    bool verbose, bool debugInfo
+    bool verbose, bool debugInfo, std::string fileName = ""
 ) {
     std::string line;
 
@@ -741,7 +741,7 @@ int compileFromStream(std::istream& input,
         }
     }
 
-    if (debugInfo) {
+    if (debugInfo && fileName.size() > 0) {
         std::ofstream debugFile(fileName + ".bin.dbg");
         if (debugFile.is_open()) {
             // Write variable names and their indices
@@ -771,21 +771,21 @@ int compileFromStream(std::istream& input,
 
 int compileFromFile(std::ifstream& file,
     CompilerData* compilerData,
-    bool verbose, bool debugInfo
+    bool verbose, bool debugInfo, std::string fileName = ""
 ) {
     if (!file.is_open()) {
         std::cerr << "File is not open" << std::endl;
         return -1;
     }
-    return compileFromStream(file, compilerData, verbose, debugInfo);
+    return compileFromStream(file, compilerData, verbose, debugInfo, fileName);
 }
 
 int compileFromText(const std::string& text,
     CompilerData* compilerData,
-    bool verbose, bool debugInfo
+    bool verbose, bool debugInfo, std::string fileName = ""
 ) {
     std::istringstream stream(text);
-    return compileFromStream(stream, compilerData, verbose, debugInfo);
+    return compileFromStream(stream, compilerData, verbose, debugInfo, fileName);
 }
 
 int compile(std::string fileName,
@@ -797,7 +797,7 @@ int compile(std::string fileName,
         std::cerr << "Could not open file: " << fileName << std::endl;
         return -1;
     }
-    int result = compileFromFile(file, compilerData, verbose, debugInfo);
+    int result = compileFromFile(file, compilerData, verbose, debugInfo, fileName);
     file.close();
     return result;
 }

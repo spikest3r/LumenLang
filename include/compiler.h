@@ -11,12 +11,12 @@ int compile(std::string fileName,
 
 int compileFromFile(std::ifstream& file,
     CompilerData* compilerData,
-    bool verbose = false, bool debugInfo = false
+    bool verbose = false, bool debugInfo = false, std::string fileName = ""
 );
 
 int compileFromText(const std::string& text,
     CompilerData* compilerData,
-    bool verbose = false, bool debugInfo = false
+    bool verbose = false, bool debugInfo = false, std::string fileName = ""
 );
 
 void compileExpression(
