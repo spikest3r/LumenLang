@@ -67,7 +67,6 @@ std::unordered_map<std::string, Function> funcList = {
     {"strfind", {0xAB, 3}},
     {"strcase", {0xAC, 3}},
     {"trim", {0xAD, 2}}
-<<<<<<< HEAD
 };
 
 // 0xD0 - 0xFF is reserved for embedded functions
@@ -86,8 +85,6 @@ std::map<std::string, Function> picoFuncList = {
     {"shiftLeft", {0xDB,2}},
     {"shiftRight", {0xDC,2}},
     {"or", {0xDD,2}},
-=======
->>>>>>> main
 };
 
 void printError(std::string error, int line) {
@@ -187,11 +184,6 @@ int compile(std::string fileName,
                     formula += tokens[i];
                 }
 
-<<<<<<< HEAD
-                compileExpression(
-                    formula, compilerData, bytecode
-                ); // result in stack
-=======
                 try {
                     compileExpression(
                         formula, compilerData, bytecode
@@ -200,7 +192,6 @@ int compile(std::string fileName,
                     printError(e.what(), lineIndex);
                     return -1;
                 }
->>>>>>> main
                 
                 bytecode.push_back(0x02);
                 keyword = tokens[0];
@@ -329,12 +320,9 @@ int compile(std::string fileName,
                         funcIndex = it->second.opcode;
                         funcArgs = 0;
                         requiredFuncArgs = it->second.argCount;
-<<<<<<< HEAD
-=======
                     } else if(tokens[1] != "=") {
                         printError("Unknown function: " + token, lineIndex);
                         return -1;
->>>>>>> main
                     }
                     continue;
                 }
@@ -354,11 +342,6 @@ int compile(std::string fileName,
             //case PUSH_STACK:
             {
                 if (token == ",") {
-<<<<<<< HEAD
-                    compileExpression(
-                        functionArgument, compilerData, bytecode
-                    ); // result in stack
-=======
                     try {
                         compileExpression(
                             functionArgument, compilerData, bytecode
@@ -367,7 +350,6 @@ int compile(std::string fileName,
                         printError(e.what(), lineIndex);
                         return -1;
                     }
->>>>>>> main
                     funcArgs++;
                     functionArgument.clear();
                     break;
@@ -448,13 +430,6 @@ int compile(std::string fileName,
 
         switch (op) {
         case FUNC_CALL:
-<<<<<<< HEAD
-            compileExpression(
-                functionArgument, compilerData, bytecode
-            ); // result in stack
-            funcArgs++;
-            functionArgument.clear();
-=======
             if(!functionArgument.empty()) {
                 try {
                     compileExpression(
@@ -467,7 +442,6 @@ int compile(std::string fileName,
                 funcArgs++;
                 functionArgument.clear();
             }
->>>>>>> main
 
             if(funcArgs != requiredFuncArgs) {
                 auto it = std::find_if(funcList.begin(), funcList.end(),
