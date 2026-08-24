@@ -19,6 +19,16 @@ int compileFromText(const std::string& text,
     bool verbose = false, bool debugInfo = false, std::string fileName = ""
 );
 
+int compileFromFile(std::ifstream& file,
+    CompilerData* compilerData,
+    bool verbose = false, bool debugInfo = false, std::string fileName = ""
+);
+
+int compileFromText(const std::string& text,
+    CompilerData* compilerData,
+    bool verbose = false, bool debugInfo = false, std::string fileName = ""
+);
+
 void compileExpression(
     std::string expr, CompilerData* data, std::vector<uint8_t>& bytecode
 );

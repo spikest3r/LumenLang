@@ -127,7 +127,7 @@ void pushToStack(std::string token, CompilerData* data, std::vector<uint8_t>& by
 
 int compileFromStream(std::istream& input,
     CompilerData* compilerData,
-    bool verbose, bool debugInfo, std::string fileName = ""
+    bool verbose, bool debugInfo, std::string fileName
 ) {
     std::string line;
 
@@ -786,7 +786,7 @@ int compileFromStream(std::istream& input,
 
 int compileFromFile(std::ifstream& file,
     CompilerData* compilerData,
-    bool verbose, bool debugInfo, std::string fileName = ""
+    bool verbose, bool debugInfo, std::string fileName
 ) {
     if (!file.is_open()) {
         std::cerr << "File is not open" << std::endl;
@@ -797,7 +797,7 @@ int compileFromFile(std::ifstream& file,
 
 int compileFromText(const std::string& text,
     CompilerData* compilerData,
-    bool verbose, bool debugInfo, std::string fileName = ""
+    bool verbose, bool debugInfo, std::string fileName
 ) {
     std::istringstream stream(text);
     return compileFromStream(stream, compilerData, verbose, debugInfo, fileName);
