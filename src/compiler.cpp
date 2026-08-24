@@ -14,6 +14,7 @@ enum class BlockType {
 struct LoopJumpData {
     int locStart;
     std::vector<int> unresolvedEnds;
+    std::string iteratorVarName;
 };
 
 inline void emitUint32(std::vector<uint8_t>& bytecode, uint32_t value) {
@@ -321,7 +322,6 @@ int compile(std::string fileName,
                 op = REPEAT;
                 loopDepth++;
                 blockDepth.push_back(BlockType::REPEAT);
-                loopCondJumpStack.push_back(LoopJumpData{ static_cast<int>(bytecode.size()), {} });
                 continue;
             }
             else if (token == "endrepeat") {
@@ -505,30 +505,56 @@ int compile(std::string fileName,
             break;
             case REPEAT:
             {
-                // if x < n
-                auto variable = "cnt_" + std::to_string(blockDepth.size());
-                pushToStack(variable, compilerData, bytecode); // x
-                pushToStack(token, compilerData, bytecode); // n
-                bytecode.push_back(0xC2); // x < n
-                int loc = static_cast<int>(bytecode.size()); // location for patch
-                emitUint32(bytecode, 0x00000000); // jump offset
-                loopCondJumpStack.back().unresolvedEnds.push_back(loc);
+                if (token == ",") continue; // skip delimiter char
+                if (conditionArgs == 0) {
+                    // init var
+                    auto variable = "cnt_" + std::to_string(blockDepth.size());
+                    pushToStack("-1", compilerData, bytecode);
+                    bytecode.push_back(0x02); // POP
+                    auto idx = resolveVariableIndex(variable, compilerData);
+                    bytecode.push_back(idx); // to other variable
 
-                // x = x + 1
-                try {
-                    // x + 1
-                    compileExpression(
-                        variable + " + 1", compilerData, bytecode
-                    ); // result in stack
+                    // mark loop start
+                    loopCondJumpStack.push_back(LoopJumpData{ static_cast<int>(bytecode.size()), {} });
+
+                    // if x < n
+                    pushToStack(variable, compilerData, bytecode); // x
+                    pushToStack(token, compilerData, bytecode); // n
+                    bytecode.push_back(0xC2); // x < n
+                    int loc = static_cast<int>(bytecode.size()); // location for patch
+                    emitUint32(bytecode, 0x00000000); // jump offset
+                    loopCondJumpStack.back().unresolvedEnds.push_back(loc);
+
+                    // x = x + 1
+                    try {
+                        // x + 1
+                        compileExpression(
+                            variable + " + 1", compilerData, bytecode
+                        ); // result in stack
+                    }
+                    catch (const std::exception& e) {
+                        printError(e.what(), lineIndex);
+                        return -1;
+                    }
+
+                    bytecode.push_back(0x02); // POP
+                    auto var_index = resolveVariableIndex(variable, compilerData);
+                    bytecode.push_back(var_index); // to x
                 }
-                catch (const std::exception& e) {
-                    printError(e.what(), lineIndex);
+                else  if (conditionArgs == 1) {
+                    // iterator var name arg
+
+                    auto variable = "cnt_" + std::to_string(blockDepth.size());
+                    pushToStack(variable, compilerData, bytecode);
+                    bytecode.push_back(0x02); // POP
+                    auto var_index = resolveVariableIndex(token, compilerData);
+                    bytecode.push_back(var_index); // to other variable
+                } 
+                else {
+                    printError("Too much arguments", lineIndex);
                     return -1;
                 }
-
-                bytecode.push_back(0x02); // PUSH
-                auto var_index = resolveVariableIndex(variable, compilerData);
-                bytecode.push_back(var_index); // to x
+                conditionArgs++;
             }
             break;
             case WHILE:

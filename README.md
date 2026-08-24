@@ -31,12 +31,15 @@ Hello, Ryan!
 - Integer and floating-point arithmetic
 - String manipulation
 - String concatenation with `..`
-- Conditional execution
+- Conditional execution with `if`, `elif`, `else`
+- While loops and repeat loops
+- Loop control (`break`, `continue`)
 - Labels and jumps
 - User-defined routines
 - References and dereferencing
 - Console input/output
 - Comments
+- Inline condition expressions
 
 ### Standard Library
 
@@ -220,12 +223,78 @@ inputInt &age
 ```lumen
 if age >= 18
     println 'Adult'
+elif age >= 13
+    println 'Teenager'
 else
-    println 'Minor'
+    println 'Child'
 endif
 ```
 
-### Loops with Labels
+Conditions support inline expressions:
+
+```lumen
+number = 15
+
+if number % 15 == 0
+    println 'Divisible by 15'
+elif number % 3 == 0
+    println 'Divisible by 3'
+elif number % 5 == 0
+    println 'Divisible by 5'
+else
+    println 'Not divisible by 3 or 5'
+endif
+```
+
+### Loops
+
+#### While Loop
+
+```lumen
+i = 0
+
+while i < 10
+    println i
+    i = i + 1
+endwhile
+```
+
+#### Repeat Loop
+
+```lumen
+repeat 5
+    println 'Hello'
+endrepeat
+```
+
+#### Loop Control
+
+Use `break` to exit a loop early:
+
+```lumen
+i = 0
+
+while i < 100
+    if i == 5
+        break
+    endif
+    println i
+    i = i + 1
+endwhile
+```
+
+Use `continue` to skip to the next iteration:
+
+```lumen
+repeat 10
+    if i % 2 == 0
+        continue
+    endif
+    println i
+endrepeat
+```
+
+#### Labels and Jumps (Legacy)
 
 ```lumen
 i = 0

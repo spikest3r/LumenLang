@@ -1,7 +1,7 @@
 print 'N='
 inputInt &x
-n = 1
-repeat x
+repeat x, n
+n = n + 1
 if n % 15 == 0
 println 'FizzBuzz'
 elif n % 5 == 0
@@ -11,5 +11,4 @@ println 'Fizz'
 else
 println n
 endif
-n = n + 1
 endrepeat
