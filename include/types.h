@@ -43,7 +43,8 @@ typedef enum {
     JUMP,
     IF, ELSE,
     SUBROUTINE,
-    WHILE
+    WHILE,
+    REPEAT
 } Operation;
 
 typedef enum {

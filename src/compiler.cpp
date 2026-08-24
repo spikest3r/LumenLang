@@ -7,12 +7,13 @@ struct Function {
 
 enum class BlockType {
     IF,
-    WHILE
+    WHILE,
+    REPEAT
 };
 
 struct LoopJumpData {
     int locStart;
-    int locIf;
+    std::vector<int> unresolvedEnds;
 };
 
 inline void emitUint32(std::vector<uint8_t>& bytecode, uint32_t value) {
@@ -138,6 +139,8 @@ int compile(std::string fileName,
 
     std::vector<LoopJumpData> loopCondJumpStack;
 
+    std::string conditionTokens;
+
     int lineIndex = 1; // for user messages
     bool inRoutine = false;
     int routineIndex = -1;
@@ -145,6 +148,8 @@ int compile(std::string fileName,
 
     int funcArgs = 0;
     int requiredFuncArgs = 0;
+
+    int loopDepth = 0;
 
     while (std::getline(file, line)) {
         if (verbose) std::cout << line << std::endl;
@@ -221,9 +226,15 @@ int compile(std::string fileName,
                     printError("Unexpected 'endif' (no matching 'if')", lineIndex);
                     return -1;
                 }
-                if (elseDefined[blockDepth.size() - 1]) {
+                bool isElseDefined = elseDefined.back();
+                int i;
+                for (i = blockDepth.size() - 1; i > 0; i--) {
+                    if (blockDepth[i] == BlockType::IF) break;
+                }
+                if (isElseDefined) {
                     auto toPatch = elseJumpStack.back();
                     for (auto loc : toPatch) {
+                        if (loc == -1) continue;
                         patchUint32(bytecode, loc, static_cast<uint32_t>(bytecode.size()));
                     }
                 }
@@ -233,7 +244,7 @@ int compile(std::string fileName,
                 }
                 condJumpStack.pop_back();
                 elseJumpStack.pop_back();
-                blockDepth.pop_back();
+                blockDepth.erase(blockDepth.begin() + i);
                 elseDefined.pop_back();
                 continue;
             }
@@ -242,7 +253,7 @@ int compile(std::string fileName,
                     printError("Unexpected 'else' (no matching 'if')", lineIndex);
                     return -1;
                 }
-                elseDefined[blockDepth.size() - 1] = true;
+                elseDefined.back() = true;
                 int loc = condJumpStack.back();
 
                 // Patch false-jump location to skip the upcoming 5-byte 'JUMP32 target' instruction (1 byte opcode + 4 bytes uint32)
@@ -258,7 +269,7 @@ int compile(std::string fileName,
                     printError("Unexpected 'elif' (no matching 'if')", lineIndex);
                     return -1;
                 }
-                elseDefined[blockDepth.size() - 1] = true;
+                elseDefined.back() = true;
                 int loc = condJumpStack.back();
 
                 // Patch false-jump location to skip the upcoming 5-byte 'JUMP32 target' instruction (1 byte opcode + 4 bytes uint32)
@@ -281,8 +292,9 @@ int compile(std::string fileName,
                     return -1;
                 }
                 op = WHILE;
+                loopDepth++;
                 blockDepth.push_back(BlockType::WHILE);
-                loopCondJumpStack.push_back(LoopJumpData {static_cast<int>(bytecode.size()), -1});
+                loopCondJumpStack.push_back(LoopJumpData{ static_cast<int>(bytecode.size()), {} });
                 continue;
             }
             else if (token == "endwhile") {
@@ -290,11 +302,41 @@ int compile(std::string fileName,
                     printError("Unexpected 'endwhile' (no matching 'while')", lineIndex);
                     return -1;
                 }
+                loopDepth--;
                 auto loopData = loopCondJumpStack.back();
                 bytecode.push_back(0x06);
                 emitUint32(bytecode, static_cast<uint32_t>(loopData.locStart));
-                int loc = loopData.locIf;
-                patchUint32(bytecode, loc, static_cast<uint32_t>(bytecode.size()));
+                for (auto& loc : loopData.unresolvedEnds) {
+                    patchUint32(bytecode, loc, static_cast<uint32_t>(bytecode.size()));
+                }
+                loopCondJumpStack.pop_back();
+                blockDepth.pop_back();
+                continue;
+            }
+            else if (token == "repeat") {
+                if (op != NONE) {
+                    printError("Syntax error", lineIndex);
+                    return -1;
+                }
+                op = REPEAT;
+                loopDepth++;
+                blockDepth.push_back(BlockType::REPEAT);
+                loopCondJumpStack.push_back(LoopJumpData{ static_cast<int>(bytecode.size()), {} });
+                continue;
+            }
+            else if (token == "endrepeat") {
+                if (blockDepth.size() == 0 || blockDepth.back() != BlockType::REPEAT) {
+                    printError("Unexpected 'endrepeat' (no matching 'repeat')", lineIndex);
+                    return -1;
+                }
+                loopDepth--;
+
+                auto loopData = loopCondJumpStack.back();
+                bytecode.push_back(0x06);
+                emitUint32(bytecode, static_cast<uint32_t>(loopData.locStart));
+                for (auto& loc : loopData.unresolvedEnds) {
+                    patchUint32(bytecode, loc, static_cast<uint32_t>(bytecode.size()));
+                }
                 loopCondJumpStack.pop_back();
                 blockDepth.pop_back();
                 continue;
@@ -307,6 +349,27 @@ int compile(std::string fileName,
                 bytecode.push_back(0xFF);
                 
                 continue;
+            }
+            else if (token == "continue") {
+                if (loopDepth <= 0) {
+                    printError("Unexpected 'continue' (outside loop body)", lineIndex);
+                    return -1;
+                }
+
+                auto loopData = loopCondJumpStack.back();
+                bytecode.push_back(0x06);
+                emitUint32(bytecode, static_cast<uint32_t>(loopData.locStart));
+            }
+            else if (token == "break") {
+                if (loopDepth <= 0) {
+                    printError("Unexpected 'break' (outside loop body)", lineIndex);
+                    return -1;
+                }
+
+                bytecode.push_back(0x06); // jump
+                int loc = static_cast<int>(bytecode.size()); // location for patch
+                emitUint32(bytecode, 0x00000000); // jump offset
+                loopCondJumpStack.back().unresolvedEnds.push_back(loc);
             }
             else if (token == "routine") {
                 if (op != NONE) {
@@ -440,15 +503,58 @@ int compile(std::string fileName,
                 op = NONE;
             }
             break;
+            case REPEAT:
+            {
+                // if x < n
+                auto variable = "cnt_" + std::to_string(blockDepth.size());
+                pushToStack(variable, compilerData, bytecode); // x
+                pushToStack(token, compilerData, bytecode); // n
+                bytecode.push_back(0xC2); // x < n
+                int loc = static_cast<int>(bytecode.size()); // location for patch
+                emitUint32(bytecode, 0x00000000); // jump offset
+                loopCondJumpStack.back().unresolvedEnds.push_back(loc);
+
+                // x = x + 1
+                try {
+                    // x + 1
+                    compileExpression(
+                        variable + " + 1", compilerData, bytecode
+                    ); // result in stack
+                }
+                catch (const std::exception& e) {
+                    printError(e.what(), lineIndex);
+                    return -1;
+                }
+
+                bytecode.push_back(0x02); // PUSH
+                auto var_index = resolveVariableIndex(variable, compilerData);
+                bytecode.push_back(var_index); // to x
+            }
+            break;
             case WHILE:
             case IF:
             {
                 auto it = condOpMap.find(keyword);
                 if (it != condOpMap.end()) {
-                    if (conditionArgs != 1) {
+                    if (condOp != COP_NONE || conditionTokens.size() == 0) {
                         printError("Syntax error", lineIndex);
                         return -1;
+                    } 
+
+                    // compile expression
+                    try {
+                        compileExpression(
+                            conditionTokens, compilerData, bytecode
+                        ); // result in stack
+                        conditionTokens.clear();
                     }
+                    catch (const std::exception& e) {
+                        printError(e.what(), lineIndex);
+                        return -1;
+                    }
+
+                    conditionArgs++;
+
                     condOp = it->second;
                 }
                 else {
@@ -456,8 +562,7 @@ int compile(std::string fileName,
                         printError("Syntax error", lineIndex);
                         return -1;
                     }
-                    pushToStack(token, compilerData, bytecode);
-                    conditionArgs++;
+                    conditionTokens += token;
                 }
             }
             break;
@@ -497,6 +602,24 @@ int compile(std::string fileName,
         case WHILE:
         case IF:
         {
+            if (conditionTokens.size() == 0) {
+                printError("Syntax error", lineIndex);
+                return -1;
+            }
+
+            // compile expression
+            try {
+                compileExpression(
+                    conditionTokens, compilerData, bytecode
+                ); // result in stack
+                conditionTokens.clear();
+            }
+            catch (const std::exception& e) {
+                printError(e.what(), lineIndex);
+                return -1;
+            }
+            conditionArgs++;
+
             auto it = condOpcodeMap.find(condOp);
             if (it != condOpcodeMap.end()) {
                 if (conditionArgs != 2) {
@@ -511,7 +634,7 @@ int compile(std::string fileName,
                     condJumpStack.back() = loc;
                     break;
                 case WHILE:
-                    loopCondJumpStack.back().locIf = loc;
+                    loopCondJumpStack.back().unresolvedEnds.push_back(loc);
                     break;
                 }
             }
