@@ -29,11 +29,9 @@ int compileScript(const std::string& script) {
     // TODO: Pass flags
     CompilerData data;
 
-    int status = compile(
+    int status = compileFromText(
         script,
-        &data,
-        false,
-        false
+        &data
     );
 
     if(status != 0) return status;

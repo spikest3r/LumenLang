@@ -17,6 +17,7 @@
 - [References & Dereferencing](./language-guide/references.md)
 - [Input & Output](./language-guide/input-output.md)
 - [Conditionals](./language-guide/conditionals.md)
+- [Loops](./language-guide/loops.md)
 - [Labels & Jumps](./language-guide/labels-and-jumps.md)
 - [Routines](./language-guide/routines.md)
 - [Capabilities](./language-guide/capabilities.md)

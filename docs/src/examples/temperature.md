@@ -34,26 +34,24 @@ print 'Select mode '
 mode = 0
 inputInt &mode
 if mode == 1
-call ask
-inputInt &temp
-call c2f
-call show
+    call ask
+    inputInt &temp
+    call c2f
+    call show
+elif mode == 2
+    call ask
+    inputInt &temp
+    call f2c
+    call show
 else
-if mode == 2
-call ask
-inputInt &temp
-call f2c
-call show
-else
-println 'Incorrect mode'
-endif
+    println 'Incorrect mode'
 endif
 ```
 
 The most feature-complete example in the box. It combines:
 
 - **Four routines** (`c2f`, `f2c`, `ask`, `show`) that communicate purely through the shared variables `temp` and `result` — see [Routines](../language-guide/routines.md) for why this pattern exists.
-- **Nested `if`/`else`** to build a three-way menu (`mode == 1`, `mode == 2`, anything else) — see [Conditionals](../language-guide/conditionals.md).
+- **`elif` chain** to build a three-way menu (`mode == 1`, `mode == 2`, anything else) — see [Conditionals](../language-guide/conditionals.md).
 - **`inputInt`** used twice: once for the menu selection, once for the temperature value itself.
 
 It's a good template to copy from when you want a small menu-driven Lumen program with reusable logic.
