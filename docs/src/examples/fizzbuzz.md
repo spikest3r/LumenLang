@@ -7,50 +7,29 @@ lumen --examples fizzbuzz
 ```
 
 ```lumen
-N = 0
-
 print 'N='
-inputInt &N
-println ''
-
-i = 1
-
-label loop
-
-i15 = i % 15
-
-if i15 == 0
+inputInt &x
+repeat x, n
+n = n + 1
+if n % 15 == 0
     println 'FizzBuzz'
+elif n % 5 == 0
+    println 'Buzz'
+elif n % 3 == 0
+    println 'Fizz'
 else
-    i3 = i % 3
-
-    if i3 == 0
-        println 'Fizz'
-    else
-        i5 = i % 5
-
-        if i5 == 0
-            println 'Buzz'
-        else
-            println i
-        endif
-    endif
+    println n
 endif
-
-i = i + 1
-
-if i <= N
-    jump loop
-endif
+endrepeat
 ```
 
-The classic FizzBuzz, and the best single example of how the language pieces fit together:
+The classic FizzBuzz, now written with modern Lumen loop and condition syntax:
 
-- A `label loop` / conditional `jump loop` pair drives iteration from `i = 1` up to `N` (see [Labels & Jumps](../language-guide/labels-and-jumps.md)).
-- `%` (modulo) checks divisibility by 15, then 3, then 5.
-- Three levels of nested `if`/`else`/`endif` stand in for the `elseif` chain Lumen doesn't have (see [Conditionals](../language-guide/conditionals.md)).
+- `repeat x, n` creates a loop that runs `x` times with an iterator `n` that starts at 0 (see [Loops](../language-guide/loops.md)).
+- Since the iterator starts at 0, we increment it to get 1-indexed counting: `n = n + 1`.
+- `%` (modulo) checks divisibility, using `elif` chains instead of nested blocks (see [Conditionals](../language-guide/conditionals.md)).
 
-Note the divisibility-by-15 check runs first — this is the same "check the most specific case first" trick FizzBuzz solutions need in any language, since 15 is also divisible by 3 and 5.
+Note the divisibility-by-15 check runs first — this is the "check the most specific case first" trick FizzBuzz solutions need in any language, since 15 is also divisible by 3 and 5.
 
 ## Scan into Android
 

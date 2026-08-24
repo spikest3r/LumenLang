@@ -1,6 +1,6 @@
 # Conditionals
 
-`if` / `else` / `endif` blocks execute based on a comparison between two values.
+`if` / `elif` / `else` / `endif` blocks execute based on a comparison between two values.
 
 ```lumen
 if age >= 18
@@ -11,23 +11,49 @@ endif
 ```
 
 - Every `if` must be closed with `endif`.
-- `else` is optional.
+- `else` and `elif` are optional.
 - The condition uses one of the [comparison operators](./operators.md#comparison): `==`, `!=`, `>`, `<`, `>=`, `<=`.
 
-## Nesting
+## Chaining Conditions
 
-`if`/`endif` blocks nest freely — there's no `elseif`, so a chain of conditions is written as nested `if`/`else` blocks:
+Use `elif` (else-if) to chain multiple conditions without nesting:
 
 ```lumen
 if mode == 1
     println 'Mode one'
+elif mode == 2
+    println 'Mode two'
 else
-    if mode == 2
-        println 'Mode two'
-    else
-        println 'Unknown mode'
-    endif
+    println 'Unknown mode'
 endif
 ```
 
-This is exactly the pattern used in the [Temperature Converter](../examples/temperature.md) example. See also [FizzBuzz](../examples/fizzbuzz.md), which nests three levels deep to check divisibility by 15, 3, and 5.
+You can chain as many `elif` blocks as needed:
+
+```lumen
+if number % 15 == 0
+    println 'Divisible by 15'
+elif number % 3 == 0
+    println 'Divisible by 3'
+elif number % 5 == 0
+    println 'Divisible by 5'
+else
+    println 'Not divisible by 3 or 5'
+endif
+```
+
+## Inline Expressions in Conditions
+
+Conditions can include arithmetic and other expressions directly:
+
+```lumen
+number = 15
+
+if number % 15 == 0
+    println 'Divisible by 15'
+elif number % 3 == 0
+    println 'Divisible by 3'
+endif
+```
+
+See also [Loops](./loops.md), [FizzBuzz](../examples/fizzbuzz.md), and [Temperature Converter](../examples/temperature.md) for examples of conditionals in action.
