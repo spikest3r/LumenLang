@@ -4,7 +4,17 @@
 #include "types.h"
 #include "tokenizer.h"
 
-int compile(std::string fileName, 
+int compile(std::string fileName,
+    CompilerData* compilerData,
+    bool verbose = false, bool debugInfo = false
+);
+
+int compileFromFile(std::ifstream& file,
+    CompilerData* compilerData,
+    bool verbose = false, bool debugInfo = false
+);
+
+int compileFromText(const std::string& text,
     CompilerData* compilerData,
     bool verbose = false, bool debugInfo = false
 );

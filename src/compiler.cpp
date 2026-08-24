@@ -110,16 +110,10 @@ void pushToStack(std::string token, CompilerData* data, std::vector<uint8_t>& by
     }
 }
 
-int compile(std::string fileName,
+int compileFromStream(std::istream& input,
     CompilerData* compilerData,
     bool verbose, bool debugInfo
 ) {
-    std::ifstream file(fileName);
-    if (!file.is_open()) {
-        std::cerr << "Could not open file: " << fileName << std::endl;
-        return -1;
-    }
-
     std::string line;
 
     std::unordered_map<std::string, int> globalLabels;
@@ -134,7 +128,6 @@ int compile(std::string fileName,
 
     std::string functionArgument = "";
 
-    // int blockDepth = 0;
     std::vector<BlockType> blockDepth;
     std::vector<bool> elseDefined;
 
@@ -142,7 +135,7 @@ int compile(std::string fileName,
 
     std::string conditionTokens;
 
-    int lineIndex = 1; // for user messages
+    int lineIndex = 1;
     bool inRoutine = false;
     int routineIndex = -1;
     int routineCount = 0;
@@ -152,7 +145,7 @@ int compile(std::string fileName,
 
     int loopDepth = 0;
 
-    while (std::getline(file, line)) {
+    while (std::getline(input, line)) {
         if (verbose) std::cout << line << std::endl;
         auto tokens = tokenizeFormula(line);
         if (verbose) {
@@ -771,9 +764,40 @@ int compile(std::string fileName,
         }
     }
 
-    file.close();
-
     compilerData->variableCount = static_cast<int>(compilerData->variableMap.size());
 
     return 0;
+}
+
+int compileFromFile(std::ifstream& file,
+    CompilerData* compilerData,
+    bool verbose, bool debugInfo
+) {
+    if (!file.is_open()) {
+        std::cerr << "File is not open" << std::endl;
+        return -1;
+    }
+    return compileFromStream(file, compilerData, verbose, debugInfo);
+}
+
+int compileFromText(const std::string& text,
+    CompilerData* compilerData,
+    bool verbose, bool debugInfo
+) {
+    std::istringstream stream(text);
+    return compileFromStream(stream, compilerData, verbose, debugInfo);
+}
+
+int compile(std::string fileName,
+    CompilerData* compilerData,
+    bool verbose, bool debugInfo
+) {
+    std::ifstream file(fileName);
+    if (!file.is_open()) {
+        std::cerr << "Could not open file: " << fileName << std::endl;
+        return -1;
+    }
+    int result = compileFromFile(file, compilerData, verbose, debugInfo);
+    file.close();
+    return result;
 }

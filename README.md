@@ -261,9 +261,29 @@ endwhile
 
 #### Repeat Loop
 
+Repeat a block a fixed number of times:
+
 ```lumen
 repeat 5
     println 'Hello'
+endrepeat
+```
+
+With built-in iterator, the loop variable is automatically initialized and incremented:
+
+```lumen
+repeat 5, i
+    println i
+endrepeat
+```
+
+This is equivalent to:
+
+```lumen
+i = 0
+repeat 5
+    println i
+    i = i + 1
 endrepeat
 ```
 
@@ -286,7 +306,7 @@ endwhile
 Use `continue` to skip to the next iteration:
 
 ```lumen
-repeat 10
+repeat 10, i
     if i % 2 == 0
         continue
     endif
