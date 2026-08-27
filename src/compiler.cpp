@@ -502,7 +502,7 @@ int compileFromStream(std::istream& input,
                 if (conditionArgs == 0) {
                     // init var
                     auto variable = "cnt_" + std::to_string(blockDepth.size());
-                    pushToStack("-1", compilerData, bytecode);
+                    pushToStack("0", compilerData, bytecode);
                     bytecode.push_back(0x02); // POP
                     auto idx = resolveVariableIndex(variable, compilerData);
                     bytecode.push_back(idx); // to other variable
@@ -512,33 +512,21 @@ int compileFromStream(std::istream& input,
 
                     // if x < n
                     pushToStack(variable, compilerData, bytecode); // x
+                    bytecode.push_back(0xA8); // INCV
+                    bytecode.push_back(idx);
                     pushToStack(token, compilerData, bytecode); // n
                     bytecode.push_back(0xC2); // x < n
                     int loc = static_cast<int>(bytecode.size()); // location for patch
                     emitUint32(bytecode, 0x00000000); // jump offset
                     loopCondJumpStack.back().unresolvedEnds.push_back(loc);
-
-                    // x = x + 1
-                    try {
-                        // x + 1
-                        compileExpression(
-                            variable + " + 1", compilerData, bytecode
-                        ); // result in stack
-                    }
-                    catch (const std::exception& e) {
-                        printError(e.what(), lineIndex);
-                        return -1;
-                    }
-
-                    bytecode.push_back(0x02); // POP
-                    auto var_index = resolveVariableIndex(variable, compilerData);
-                    bytecode.push_back(var_index); // to x
                 }
                 else  if (conditionArgs == 1) {
                     // iterator var name arg
 
                     auto variable = "cnt_" + std::to_string(blockDepth.size());
                     pushToStack(variable, compilerData, bytecode);
+                    // DEC to give user zero based iterator value
+                    bytecode.push_back(0xA7); // DEC
                     bytecode.push_back(0x02); // POP
                     auto var_index = resolveVariableIndex(token, compilerData);
                     bytecode.push_back(var_index); // to other variable

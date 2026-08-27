@@ -139,6 +139,8 @@ int getOpCodeOffset(int opcode) {
     case 0xB3: // JGE
     case 0xB4: // JLE
     case 0xB5: // JNE
+    case 0xA8: // INCV
+    case 0xA9: // DECV
         return 2;
 
     case 0xAA: // JOIN
@@ -148,6 +150,8 @@ int getOpCodeOffset(int opcode) {
     case 0xA3: // DIV
     case 0xA4: // POW
     case 0xA5: // MOD
+    case 0xA6: // INC
+    case 0xA7: // DEC
     case 0xFE: // RET
     case 0xFF: // HLT
     case 0xDE:
