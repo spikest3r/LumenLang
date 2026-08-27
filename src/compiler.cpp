@@ -78,7 +78,7 @@ std::unordered_map<std::string, Function> funcList = {
     {"substr", {0xAA, 4}},
     {"strfind", {0xAB, 3}},
     {"strcase", {0xAC, 3}},
-    {"trim", {0xAD, 2}}
+    {"trim", {0xAD, 2}},
 // 0xD0 - 0xFF is reserved for embedded functions
     {"gpioInit", {0xD0,1}},
     {"gpioSetDir", {0xD1,2}},

@@ -6,17 +6,7 @@
 
 int compile(std::string fileName,
     CompilerData* compilerData,
-    bool verbose = false, bool debugInfo = false, bool picoMode = false
-);
-
-int compileFromFile(std::ifstream& file,
-    CompilerData* compilerData,
-    bool verbose = false, bool debugInfo = false, std::string fileName = ""
-);
-
-int compileFromText(const std::string& text,
-    CompilerData* compilerData,
-    bool verbose = false, bool debugInfo = false, std::string fileName = ""
+    bool verbose = false, bool debugInfo = false
 );
 
 int compileFromFile(std::ifstream& file,
