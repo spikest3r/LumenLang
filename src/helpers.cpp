@@ -139,6 +139,9 @@ int getOpCodeOffset(int opcode) {
     case 0xB3: // JGE
     case 0xB4: // JLE
     case 0xB5: // JNE
+    case 0xA8: // INCV
+    case 0xA9: // DECV
+    case 0xAB: // CPY
         return 2;
 
     case 0xAA: // JOIN
@@ -148,6 +151,8 @@ int getOpCodeOffset(int opcode) {
     case 0xA3: // DIV
     case 0xA4: // POW
     case 0xA5: // MOD
+    case 0xA6: // INC
+    case 0xA7: // DEC
     case 0xFE: // RET
     case 0xFF: // HLT
     case 0xDE:
@@ -204,7 +209,7 @@ bool isFloatLiteral(const std::string &s) {
            s.find('E') != std::string::npos;
 }
 
-std::map<int, std::string> disassemblyMap = {
+std::unordered_map<int, std::string> disassemblyMap = {
     {0x01, "CALL"},
     {0x02, "POP"},
     {0x03, "PUSH"},
@@ -219,6 +224,11 @@ std::map<int, std::string> disassemblyMap = {
     {0xA3, "DIV"},
     {0xA4, "POW"},
     {0xA5, "MOD"},
+
+    {0xA6, "INC"},
+    {0xA7, "DEC"},
+    {0xA8, "INCV"},
+    {0xA9, "DECV"},
 
     // 8-bit / Standard Branches
     {0xB0, "JEQ"},
@@ -237,6 +247,7 @@ std::map<int, std::string> disassemblyMap = {
     {0xC5, "JNE32"},
 
     {0xAA, "JOIN"},
+    {0xAB, "CPY"},
     {0xDE, "DEREF"},
     {0xFE, "RET"},
     {0xFF, "HLT"}

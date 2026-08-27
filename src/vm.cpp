@@ -289,6 +289,82 @@ int execute(
         execData->stack.push_back(result);
         break;
     }
+    case 0xA6: { // INC
+        if (!execData->stack.empty()) {
+            auto* x = &execData->stack.back();
+
+            switch (x->type) {
+            case TAG_FLOAT:
+                std::get<double>(x->data)++;
+                break;
+
+            case TAG_INT:
+                std::get<int64_t>(x->data)++;
+                break;
+
+            case TAG_STRING:
+                break;
+            }
+        }
+        break;
+    }
+    case 0xA7: { // DEC
+        if (!execData->stack.empty()) {
+            auto* x = &execData->stack.back();
+
+            switch (x->type) {
+            case TAG_FLOAT:
+                std::get<double>(x->data)--;
+                break;
+
+            case TAG_INT:
+                std::get<int64_t>(x->data)--;
+                break;
+
+            case TAG_STRING:
+                break;
+            }
+        }
+        break;
+    }
+    case 0xA8: { // INCV
+        auto value = progData->bytecode[execData->PC + 1];
+        Variant* x = &execData->variables[value];
+
+        switch (x->type) {
+        case TAG_FLOAT:
+            std::get<double>(x->data)++;
+            break;
+
+        case TAG_INT:
+            std::get<int64_t>(x->data)++;
+            break;
+
+        case TAG_STRING:
+            break;
+        }
+
+        break;
+    }
+    case 0xA9: { // DECV
+        auto value = progData->bytecode[execData->PC + 1];
+        Variant* x = &execData->variables[value];
+
+        switch (x->type) {
+        case TAG_FLOAT:
+            std::get<double>(x->data)--;
+            break;
+
+        case TAG_INT:
+            std::get<int64_t>(x->data)--;
+            break;
+
+        case TAG_STRING:
+            break;
+        }
+
+        break;
+    }
     case 0xB0: // ==
     case 0xB1: // >
     case 0xB2: // <
@@ -365,6 +441,12 @@ int execute(
             result = str + result; // prepend to maintain order
         }
         execData->stack.push_back({ TAG_STRING, result });
+        break;
+    }
+    case 0xAB: {
+        // copy from stack to variable without pop
+        auto value = progData->bytecode[execData->PC + 1]; // get location
+        execData->variables[value] = execData->stack.back();
         break;
     }
     case 0xDE: { // dereference
