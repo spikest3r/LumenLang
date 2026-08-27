@@ -161,6 +161,7 @@ int compileFromStream(std::istream& input,
         int varIndex_assign = 0;
         ConditionOp condOp = COP_NONE;
         std::vector<uint8_t>& bytecode = inRoutine ? subroutineBytecode[routineIndex] : compilerData->bytecode;
+        std::vector<std::string> tokenStack; // for temporary holds, cleared on every new line
 
         for (const auto& token : tokens) {
             if (token == "=") {
@@ -499,54 +500,11 @@ int compileFromStream(std::istream& input,
             case REPEAT:
             {
                 if (token == ",") continue; // skip delimiter char
-                if (conditionArgs == 0) {
-                    // init var
-                    auto variable = "cnt_" + std::to_string(blockDepth.size());
-                    pushToStack("-1", compilerData, bytecode);
-                    bytecode.push_back(0x02); // POP
-                    auto idx = resolveVariableIndex(variable, compilerData);
-                    bytecode.push_back(idx); // to other variable
-
-                    // mark loop start
-                    loopCondJumpStack.push_back(LoopJumpData{ static_cast<int>(bytecode.size()), {} });
-
-                    // if x < n
-                    pushToStack(variable, compilerData, bytecode); // x
-                    pushToStack(token, compilerData, bytecode); // n
-                    bytecode.push_back(0xC2); // x < n
-                    int loc = static_cast<int>(bytecode.size()); // location for patch
-                    emitUint32(bytecode, 0x00000000); // jump offset
-                    loopCondJumpStack.back().unresolvedEnds.push_back(loc);
-
-                    // x = x + 1
-                    try {
-                        // x + 1
-                        compileExpression(
-                            variable + " + 1", compilerData, bytecode
-                        ); // result in stack
-                    }
-                    catch (const std::exception& e) {
-                        printError(e.what(), lineIndex);
-                        return -1;
-                    }
-
-                    bytecode.push_back(0x02); // POP
-                    auto var_index = resolveVariableIndex(variable, compilerData);
-                    bytecode.push_back(var_index); // to x
-                }
-                else  if (conditionArgs == 1) {
-                    // iterator var name arg
-
-                    auto variable = "cnt_" + std::to_string(blockDepth.size());
-                    pushToStack(variable, compilerData, bytecode);
-                    bytecode.push_back(0x02); // POP
-                    auto var_index = resolveVariableIndex(token, compilerData);
-                    bytecode.push_back(var_index); // to other variable
-                } 
-                else {
+                if(conditionArgs > 2) {
                     printError("Too much arguments", lineIndex);
                     return -1;
                 }
+                tokenStack.push_back(token);
                 conditionArgs++;
             }
             break;
@@ -661,11 +619,41 @@ int compileFromStream(std::istream& input,
                 printError("Syntax error", lineIndex);
                 return -1;
             }
+            break;
         }
-        break;
+        case REPEAT: {
+            // init var
+            auto variable = "cnt_" + std::to_string(blockDepth.size());
+            pushToStack("0", compilerData, bytecode);
+            bytecode.push_back(0x02); // POP
+            auto idx = resolveVariableIndex(variable, compilerData);
+            bytecode.push_back(idx); // to other variable
+
+            // mark loop start
+            loopCondJumpStack.push_back(LoopJumpData{ static_cast<int>(bytecode.size()), {} });
+
+            // if x < n
+            pushToStack(variable, compilerData, bytecode); // x
+            if (conditionArgs == 2) {
+                // iterator var name arg
+                auto var_index = resolveVariableIndex(tokenStack[1], compilerData);
+                // copy to user specified iterator variable
+                bytecode.push_back(0xAB);
+                bytecode.push_back(var_index);
+            } 
+            bytecode.push_back(0xA8); // INCV
+            bytecode.push_back(idx);
+            pushToStack(tokenStack[0], compilerData, bytecode); // n
+            bytecode.push_back(0xC2); // x < n
+            int loc = static_cast<int>(bytecode.size()); // location for patch
+            emitUint32(bytecode, 0x00000000); // jump offset
+            loopCondJumpStack.back().unresolvedEnds.push_back(loc);
+            break;
+        }
         }
         op = NONE;
 
+        tokenStack.clear();
         lineIndex++;
     }
 

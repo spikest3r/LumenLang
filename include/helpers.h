@@ -36,4 +36,4 @@ bool isVar(const std::string &s);
 std::string variantToString(const Variant& v);
 bool isFloatLiteral(const std::string &s);
 
-extern std::map<int, std::string> disassemblyMap;
+extern std::unordered_map<int, std::string> disassemblyMap;
