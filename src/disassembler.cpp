@@ -164,6 +164,7 @@ void disassemble(std::vector<uint8_t> bytecode,
         case 0xA7:
         case 0xA8:
         case 0xA9:
+        case 0xAB:
             if (offset > 1) {
                 uint8_t varIdx = bytecode[PC + 1];
                 if (hasDebugData && variables_debug.count(varIdx)) {

@@ -141,6 +141,7 @@ int getOpCodeOffset(int opcode) {
     case 0xB5: // JNE
     case 0xA8: // INCV
     case 0xA9: // DECV
+    case 0xAB: // CPY
         return 2;
 
     case 0xAA: // JOIN
@@ -246,6 +247,7 @@ std::unordered_map<int, std::string> disassemblyMap = {
     {0xC5, "JNE32"},
 
     {0xAA, "JOIN"},
+    {0xAB, "CPY"},
     {0xDE, "DEREF"},
     {0xFE, "RET"},
     {0xFF, "HLT"}

@@ -443,6 +443,12 @@ int execute(
         execData->stack.push_back({ TAG_STRING, result });
         break;
     }
+    case 0xAB: {
+        // copy from stack to variable without pop
+        auto value = progData->bytecode[execData->PC + 1]; // get location
+        execData->variables[value] = execData->stack.back();
+        break;
+    }
     case 0xDE: { // dereference
         Variant ptrVar = execData->stack.back(); execData->stack.pop_back();
         if(ptrVar.type != TAG_INT) {
