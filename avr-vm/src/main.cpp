@@ -27,8 +27,9 @@ int loadFromFlash(const uint8_t* data, int dataSize) {
     bool isV3 = (sig0 == 0xFE && sig1 == 0xFC);
     bool isV4 = (sig0 == 0xFE && sig1 == 0xFD);
     bool isV5 = (sig0 == 0xFE && sig1 == 0xFE);
+    bool isV6 = (sig0 == 0xFE && sig1 == 0xFF);
 
-    if (!isV2 && !isV3 && !isV4 && !isV5) {
+    if (!isV2 && !isV3 && !isV4 && !isV5 && !isV6) {
         send_uart("Invalid signature\n");
 
         if (sig0 == 0xFE && sig1 == 0xFA) {

@@ -349,6 +349,64 @@ int execute(
           }
           break;
         }
+      case 0xA6: { // INC
+          Variant* x = &stack[stackPointer];
+          switch(x->type) {
+              case TAG_INT:
+                  x->data.i++;
+                  break;
+              case TAG_FLOAT:
+                  x->data.i++;
+                  break;
+              case TAG_STRING:
+                  break;
+          }
+          break;
+      }
+      case 0xA7: { // DEC
+          Variant* x = &stack[stackPointer];
+          switch(x->type) {
+              case TAG_INT:
+                  x->data.i--;
+                  break;
+              case TAG_FLOAT:
+                  x->data.i--;
+                  break;
+              case TAG_STRING:
+                  break;
+          }
+          break;
+      }
+      case 0xA8: { // INCV
+          int value = bytecode[PC + 1];
+          Variant* x = &variables[value];
+          switch(x->type) {
+              case TAG_INT:
+                  x->data.i++;
+                  break;
+              case TAG_FLOAT:
+                  x->data.i++;
+                  break;
+              case TAG_STRING:
+                  break;
+          }
+          break;
+      }
+      case 0xA9: { // DECV
+          int value = bytecode[PC + 1];
+          Variant* x = &variables[value];
+          switch(x->type) {
+              case TAG_INT:
+                  x->data.i--;
+                  break;
+              case TAG_FLOAT:
+                  x->data.i--;
+                  break;
+              case TAG_STRING:
+                  break;
+          }
+          break;
+      }
       case 0xB0:
       case 0xB1:
       case 0xB2:
@@ -448,6 +506,11 @@ int execute(
 
           break;
         }
+      case 0xAB: { // CPY
+        int value = bytecode[PC + 1];
+        variables[value] = stack[stackPointer];
+        break;
+      }
       case 0xDE:
         {
           if (stackPointer < 0) return -1;

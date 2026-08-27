@@ -71,6 +71,9 @@ int getOpCodeOffset(int opcode) {
     case 0xB5:
     case 0x05:
     case 0x01:
+    case 0xA8:
+    case 0xA9:
+    case 0xAB:
       return 2;
     case 0xFF:
     case 0xA0:
@@ -81,6 +84,9 @@ int getOpCodeOffset(int opcode) {
     case 0xA5:
     case 0xAA:
     case 0xFE:
+    case 0xDE:
+    case 0xA6:
+    case 0xA7:
       return 1;
     case 0x06:
     case 0x07:
