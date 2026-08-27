@@ -48,7 +48,6 @@ static const std::unordered_map<std::string, ConditionOp> condOpMap = {
 };
 
 static const std::unordered_map<ConditionOp, uint8_t> condOpcodeMap = {
-static const std::unordered_map<ConditionOp, uint8_t> condOpcodeMap = {
     {EQUALS,        0xC0},
     {GREATER,       0xC1},
     {LESSER,        0xC2},
@@ -79,7 +78,7 @@ std::unordered_map<std::string, Function> funcList = {
     {"substr", {0xAA, 4}},
     {"strfind", {0xAB, 3}},
     {"strcase", {0xAC, 3}},
-    {"trim", {0xAD, 2}}
+    {"trim", {0xAD, 2}},
 // 0xD0 - 0xFF is reserved for embedded functions
     {"gpioInit", {0xD0,1}},
     {"gpioSetDir", {0xD1,2}},

@@ -6,7 +6,7 @@
 
 int compile(std::string fileName,
     CompilerData* compilerData,
-    bool verbose = false, bool debugInfo = false, bool picoMode = false
+    bool verbose = false, bool debugInfo = false
 );
 
 int compileFromFile(std::ifstream& file,

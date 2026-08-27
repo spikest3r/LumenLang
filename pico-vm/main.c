@@ -192,42 +192,47 @@ static uint32_t readU32FromBytecode(const uint8_t* bytecode, int pos) {
 }
 
 int getOpCodeOffset(int opcode) {
-    switch(opcode) {
-        case 0x03:
-            return 3;
-        case 0x04:
-        case 0x02:
-        case 0xB0: // JEQ  (legacy 8-bit)
-        case 0xB1: // JGR  (legacy 8-bit)
-        case 0xB2: // JLS  (legacy 8-bit)
-        case 0xB3: // JGE  (legacy 8-bit)
-        case 0xB4: // JLE  (legacy 8-bit)
-        case 0xB5: // JNE  (legacy 8-bit)
-        case 0x05: // JUMP (legacy 8-bit)
-        case 0x01: // CALL (legacy 8-bit)
-            return 2;
-        case 0xFF:
-        case 0xA0:
-        case 0xA1:
-        case 0xA2:
-        case 0xA3:
-        case 0xA4:
-        case 0xA5:
-        case 0xAA:
-        case 0xDE:
-        case 0xFE:
-            return 1;
-        case 0x06: // JUMP32
-        case 0x07: // CALL32
-        case 0xC0: // JEQ32
-        case 0xC1: // JGR32
-        case 0xC2: // JLS32
-        case 0xC3: // JGE32
-        case 0xC4: // JLE32
-        case 0xC5: // JNE32
-            return 5;
-    }
-    return 0;
+  switch (opcode) {
+    case 0x03:
+      return 3;
+    case 0x04:
+    case 0x02:
+    case 0xB0:
+    case 0xB1:
+    case 0xB2:
+    case 0xB3:
+    case 0xB4:
+    case 0xB5:
+    case 0x05:
+    case 0x01:
+    case 0xA8:
+    case 0xA9:
+    case 0xAB:
+      return 2;
+    case 0xFF:
+    case 0xA0:
+    case 0xA1:
+    case 0xA2:
+    case 0xA3:
+    case 0xA4:
+    case 0xA5:
+    case 0xAA:
+    case 0xFE:
+    case 0xDE:
+    case 0xA6:
+    case 0xA7:
+      return 1;
+    case 0x06:
+    case 0x07:
+    case 0xC0:
+    case 0xC1:
+    case 0xC2:
+    case 0xC3:
+    case 0xC4:
+    case 0xC5:
+      return 5;
+  }
+  return 1;
 }
 
 typedef void (*NativeFn)(Variant stack[16], Variant variables[16], int* sp);
@@ -909,6 +914,64 @@ int execute(
                 }
                 break;
             }
+            case 0xA6: { // INC
+                Variant* x = &stack[stackPointer];
+                switch(x->type) {
+                    case TAG_INT:
+                        x->data.i++;
+                        break;
+                    case TAG_FLOAT:
+                        x->data.i++;
+                        break;
+                    case TAG_STRING:
+                        break;
+                }
+                break;
+            }
+            case 0xA7: { // DEC
+                Variant* x = &stack[stackPointer];
+                switch(x->type) {
+                    case TAG_INT:
+                        x->data.i--;
+                        break;
+                    case TAG_FLOAT:
+                        x->data.i--;
+                        break;
+                    case TAG_STRING:
+                        break;
+                }
+                break;
+            }
+            case 0xA8: { // INCV
+                int value = bytecode[PC + 1];
+                Variant* x = &variables[value];
+                switch(x->type) {
+                    case TAG_INT:
+                        x->data.i--;
+                        break;
+                    case TAG_FLOAT:
+                        x->data.i--;
+                        break;
+                    case TAG_STRING:
+                        break;
+                }
+                break;
+            }
+            case 0xA9: { // DECV
+                int value = bytecode[PC + 1];
+                Variant* x = &variables[value];
+                switch(x->type) {
+                    case TAG_INT:
+                        x->data.i--;
+                        break;
+                    case TAG_FLOAT:
+                        x->data.i--;
+                        break;
+                    case TAG_STRING:
+                        break;
+                }
+                break;
+            }
             case 0xB0:
             case 0xB1:
             case 0xB2:
@@ -994,6 +1057,11 @@ int execute(
                 stack[stackPointer].type = TAG_STRING;
                 stack[stackPointer].data.str = joinBuffer;
 
+                break;
+            }
+            case 0xAB: { // CPY
+                int value = bytecode[PC + 1];
+                variables[value] = stack[stackPointer];
                 break;
             }
             case 0xDE: {
