@@ -35,6 +35,7 @@
 
 - [Lumen in Spreadsheets](./lumen-in-apps/lumen-in-spreadsheets.md)
 - [Lumen on Android](./lumen-in-apps/lumen-on-android.md)
+- [Lumina — Visual Game Creation](./lumen-in-apps/lumina.md)
 - [Lumen in Yate IVR](./lumen-in-apps/lumen-in-yate-ivr.md)
 
 # Platforms & Ports

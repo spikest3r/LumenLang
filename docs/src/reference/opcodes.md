@@ -74,6 +74,22 @@ As with `CALL`/`JUMP` above, there are two parallel families here — an 8-bit l
 
 In both families, the operand is the offset to jump to **if the comparison is false** (i.e. it's the "skip the true-branch body" target, not a "jump if true" target).
 
+## Variable operations
+
+| Opcode | Mnemonic | Size | Operands | Behavior |
+|---|---|---|---|---|
+| `0xA6` | `INC` | 1 | — | Pop the stack top, increment it, push the result. Equivalent to `x + 1` |
+| `0xA7` | `DEC` | 1 | — | Pop the stack top, decrement it, push the result. Equivalent to `x - 1` |
+| `0xA8` | `INCV` | 2 | variable slot | Increment the variable at the given slot in-place |
+| `0xA9` | `DECV` | 2 | variable slot | Decrement the variable at the given slot in-place |
+| `0xAB` | `CPY` | 2 | variable slot | Copy the variable at the given slot onto the stack — equivalent to reading a variable but used internally for optimizing certain patterns |
+
+## Pointer operations
+
+| Opcode | Mnemonic | Size | Behavior |
+|---|---|---|---|
+| `0xDE` | `DEREF` | 1 | Pop a reference (pointer) from the stack and dereference it — replace it with the value it points to |
+
 ## Strings
 
 | Opcode | Mnemonic | Size | Behavior |
