@@ -26,6 +26,103 @@ bool isFloatVariant(const Variant& a, const Variant& b) {
     return a.type == TAG_FLOAT || b.type == TAG_FLOAT;
 }
 
+static size_t variantByteSize(const Variant& v) {
+    switch (v.type) {
+    case TAG_INT:
+        return sizeof(int64_t);
+    case TAG_FLOAT:
+        return sizeof(double);
+    case TAG_STRING:
+        return std::get<std::string>(v.data).size() + 1;
+    }
+    return 0;
+}
+
+static void writeVariable(VMExecutionData* execData, int index, const Variant& v) {
+    size_t size = variantByteSize(v);
+    execData->translator.allocateSlotSize(index, size, v.type);
+    const Slot* slot = execData->translator.readSlot(index);
+    void* dst = execData->memory.deref(slot->h);
+
+    switch (v.type) {
+    case TAG_INT: {
+        int64_t val = std::get<int64_t>(v.data);
+        std::memcpy(dst, &val, sizeof(val));
+        break;
+    }
+    case TAG_FLOAT: {
+        double val = std::get<double>(v.data);
+        std::memcpy(dst, &val, sizeof(val));
+        break;
+    }
+    case TAG_STRING: {
+        const std::string& val = std::get<std::string>(v.data);
+        std::memcpy(dst, val.data(), val.size());
+        static_cast<char*>(dst)[val.size()] = '\0';
+        break;
+    }
+    }
+}
+
+static Variant readVariable(VMExecutionData* execData, int index) {
+    const Slot* slot = execData->translator.readSlot(index);
+    if (!slot) {
+        return { TAG_INT, static_cast<int64_t>(0) };
+    }
+
+    void* src = execData->memory.deref(slot->h);
+
+    Variant v;
+    v.type = slot->tag;
+
+    switch (slot->tag) {
+    case TAG_INT: {
+        int64_t val;
+        std::memcpy(&val, src, sizeof(val));
+        v.data = val;
+        break;
+    }
+    case TAG_FLOAT: {
+        double val;
+        std::memcpy(&val, src, sizeof(val));
+        v.data = val;
+        break;
+    }
+    case TAG_STRING: {
+        v.data = std::string(static_cast<const char*>(src));
+        break;
+    }
+    }
+
+    return v;
+}
+
+static void mutateVariable(VMExecutionData* execData, int index, bool increment) {
+    const Slot* slot = execData->translator.readSlot(index);
+    if (!slot) return;
+
+    void* ptr = execData->memory.deref(slot->h);
+
+    switch (slot->tag) {
+    case TAG_FLOAT: {
+        double val;
+        std::memcpy(&val, ptr, sizeof(val));
+        val += increment ? 1.0 : -1.0;
+        std::memcpy(ptr, &val, sizeof(val));
+        break;
+    }
+    case TAG_INT: {
+        int64_t val;
+        std::memcpy(&val, ptr, sizeof(val));
+        val += increment ? 1 : -1;
+        std::memcpy(ptr, &val, sizeof(val));
+        break;
+    }
+    case TAG_STRING:
+        break;
+    }
+}
+
 int run(
     VMProgramData* progData
 ) {
@@ -33,15 +130,13 @@ int run(
     execData.PC = 0;
     execData.routineBase = 0;
 
-    execData.variables.resize(progData->variableCount);
-
     while(true) {
         auto opcode = progData->bytecode[execData.PC];
         int offset = getOpCodeOffset(opcode);
-        
+
         int result = execute(progData, &execData);
 
-        if(execData.halt || result == -1) 
+        if(execData.halt || result == -1)
             break;
         execData.PC = result;
     }
@@ -58,7 +153,6 @@ int execute(
 
     switch (opcode) {
     case 0x01:
-        // run subroutine (CALL8 legacy)
     {
         auto addr = progData->bytecode[execData->PC + 1];
         execData->pcStack.push_back({
@@ -86,23 +180,13 @@ int execute(
         return frame.returnPC;
     }
     break;
-    break;
     case 0x02:
     {
         auto varIndex = progData->bytecode[execData->PC + 1];
-        auto var = execData->stack.back();
-        execData->variables[varIndex].type = var.type;
-        switch (var.type) {
-        case TAG_INT:
-            execData->variables[varIndex].data = std::get<int64_t>(var.data);
-            break;
-        case TAG_FLOAT:
-            execData->variables[varIndex].data = std::get<double>(var.data);
-            break;
-        case TAG_STRING:
-            execData->variables[varIndex].data = std::get<std::string>(var.data);
-            break;
-        }
+        Variant var = execData->stack.back();
+
+        writeVariable(execData, varIndex, var);
+
         execData->stack.pop_back();
     }
     break;
@@ -119,13 +203,12 @@ int execute(
             break;
         case 0x03:
         {
-            auto variable = execData->variables[value];
-            execData->stack.push_back({ variable.type, variable.data });
+            Variant variable = readVariable(execData, value);
+            execData->stack.push_back(variable);
         }
         break;
         case 0x04:
         {
-            // raw uint8_t passed
             execData->stack.push_back({ TAG_INT, static_cast<int64_t>(value) });
         }
         break;
@@ -152,7 +235,7 @@ int execute(
         }
         break;
     }
-    case 0x05: // JUMP8 legacy
+    case 0x05:
     {
         auto newPC = progData->bytecode[execData->PC + 1];
         return execData->routineBase + newPC;
@@ -181,7 +264,7 @@ int execute(
         return target;
     }
     break;
-    case 0xA0: { // ADD
+    case 0xA0: {
         if(execData->stack.size() < 2) {
             execData->stack.push_back({TAG_INT, 0});
             break;
@@ -200,7 +283,7 @@ int execute(
         execData->stack.push_back(result);
         break;
     }
-    case 0xA1: { // SUB
+    case 0xA1: {
         if(execData->stack.size() < 2) {
             execData->stack.push_back({TAG_INT, 0});
             break;
@@ -219,7 +302,7 @@ int execute(
         execData->stack.push_back(result);
         break;
     }
-    case 0xA2: { // MUL
+    case 0xA2: {
         if(execData->stack.size() < 2) {
             execData->stack.push_back({TAG_INT, 0});
             break;
@@ -238,7 +321,7 @@ int execute(
         execData->stack.push_back(result);
         break;
     }
-    case 0xA3: { // DIV
+    case 0xA3: {
         if(execData->stack.size() < 2) {
             execData->stack.push_back({TAG_INT, 0});
             break;
@@ -251,7 +334,7 @@ int execute(
         execData->stack.push_back(result);
         break;
     }
-    case 0xA4: { // POW
+    case 0xA4: {
         if(execData->stack.size() < 2) {
             execData->stack.push_back({TAG_INT, 0});
             break;
@@ -270,7 +353,7 @@ int execute(
         execData->stack.push_back(result);
         break;
     }
-    case 0xA5: { // MOD
+    case 0xA5: {
         if(execData->stack.size() < 2) {
             execData->stack.push_back({TAG_INT, 0});
             break;
@@ -289,7 +372,7 @@ int execute(
         execData->stack.push_back(result);
         break;
     }
-    case 0xA6: { // INC
+    case 0xA6: {
         if (!execData->stack.empty()) {
             auto* x = &execData->stack.back();
 
@@ -308,7 +391,7 @@ int execute(
         }
         break;
     }
-    case 0xA7: { // DEC
+    case 0xA7: {
         if (!execData->stack.empty()) {
             auto* x = &execData->stack.back();
 
@@ -327,50 +410,22 @@ int execute(
         }
         break;
     }
-    case 0xA8: { // INCV
+    case 0xA8: {
         auto value = progData->bytecode[execData->PC + 1];
-        Variant* x = &execData->variables[value];
-
-        switch (x->type) {
-        case TAG_FLOAT:
-            std::get<double>(x->data)++;
-            break;
-
-        case TAG_INT:
-            std::get<int64_t>(x->data)++;
-            break;
-
-        case TAG_STRING:
-            break;
-        }
-
+        mutateVariable(execData, value, true);
         break;
     }
-    case 0xA9: { // DECV
+    case 0xA9: {
         auto value = progData->bytecode[execData->PC + 1];
-        Variant* x = &execData->variables[value];
-
-        switch (x->type) {
-        case TAG_FLOAT:
-            std::get<double>(x->data)--;
-            break;
-
-        case TAG_INT:
-            std::get<int64_t>(x->data)--;
-            break;
-
-        case TAG_STRING:
-            break;
-        }
-
+        mutateVariable(execData, value, false);
         break;
     }
-    case 0xB0: // ==
-    case 0xB1: // >
-    case 0xB2: // <
-    case 0xB3: // >=
-    case 0xB4: // <=
-    case 0xB5: // != 
+    case 0xB0:
+    case 0xB1:
+    case 0xB2:
+    case 0xB3:
+    case 0xB4:
+    case 0xB5:
     {
         Variant a, b;
         if(execData->stack.size() < 2) {
@@ -400,12 +455,12 @@ int execute(
         }
         break;
     }
-    case 0xC0: // ==32
-    case 0xC1: // >32
-    case 0xC2: // <32
-    case 0xC3: // >=32
-    case 0xC4: // <=32
-    case 0xC5: // !=32
+    case 0xC0:
+    case 0xC1:
+    case 0xC2:
+    case 0xC3:
+    case 0xC4:
+    case 0xC5:
     {
         Variant b = execData->stack.back(); execData->stack.pop_back();
         Variant a = execData->stack.back(); execData->stack.pop_back();
@@ -432,35 +487,36 @@ int execute(
 
         break;
     }
-    case 0xAA: { // join strings
+    case 0xAA: {
         int strCount = getInt(execData->stack.back()); execData->stack.pop_back();
         std::string result;
         for (int i = 0; i < strCount; i++) {
             Variant strVar = execData->stack.back(); execData->stack.pop_back();
             std::string str = std::get<std::string>(strVar.data);
-            result = str + result; // prepend to maintain order
+            result = str + result;
         }
         execData->stack.push_back({ TAG_STRING, result });
         break;
     }
     case 0xAB: {
-        // copy from stack to variable without pop
-        auto value = progData->bytecode[execData->PC + 1]; // get location
-        execData->variables[value] = execData->stack.back();
+        auto value = progData->bytecode[execData->PC + 1];
+        Variant var = execData->stack.back();
+        writeVariable(execData, value, var);
         break;
     }
-    case 0xDE: { // dereference
+    case 0xDE: {
         Variant ptrVar = execData->stack.back(); execData->stack.pop_back();
         if(ptrVar.type != TAG_INT) {
             std::cout << "Invalid dereference" << std::endl;
             return -1;
         }
         int ptr = getInt(ptrVar);
-        if(ptr >= execData->variables.size() || ptr < 0) {
+        const Slot* slot = execData->translator.readSlot(ptr);
+        if (!slot) {
             std::cout << "Invalid dereference" << std::endl;
             return -1;
         }
-        Variant variable = execData->variables[ptr];
+        Variant variable = readVariable(execData, ptr);
         execData->stack.push_back(variable);
         break;
     }
@@ -469,7 +525,7 @@ int execute(
         break;
     default:
         std::cout << "Invalid opcode: " << (int)opcode << std::endl;
-        return -1; // error
+        return -1;
     }
 
     return execData->PC + offset;

@@ -217,7 +217,7 @@ int compileFromStream(std::istream& input,
                 continue;
             }
             else if (token == "endif") {
-                if (blockDepth.back() != BlockType::IF) {
+                if (blockDepth.size() == 0 || blockDepth.back() != BlockType::IF) {
                     printError("Unexpected 'endif' (no matching 'if')", lineIndex);
                     return -1;
                 }
