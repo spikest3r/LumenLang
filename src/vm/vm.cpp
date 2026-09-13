@@ -1,4 +1,5 @@
 #include "vm.h"
+#include "helpers.h"
 
 inline uint32_t readU32(const std::vector<uint8_t>& bytecode, size_t& pc)
 {
@@ -24,103 +25,6 @@ double getNumeric(const Variant& v) {
 
 bool isFloatVariant(const Variant& a, const Variant& b) {
     return a.type == TAG_FLOAT || b.type == TAG_FLOAT;
-}
-
-static size_t variantByteSize(const Variant& v) {
-    switch (v.type) {
-    case TAG_INT:
-        return sizeof(int64_t);
-    case TAG_FLOAT:
-        return sizeof(double);
-    case TAG_STRING:
-        return std::get<std::string>(v.data).size() + 1;
-    }
-    return 0;
-}
-
-static void writeVariable(VMExecutionData* execData, int index, const Variant& v) {
-    size_t size = variantByteSize(v);
-    execData->translator.allocateSlotSize(index, size, v.type);
-    const Slot* slot = execData->translator.readSlot(index);
-    void* dst = execData->memory.deref(slot->h);
-
-    switch (v.type) {
-    case TAG_INT: {
-        int64_t val = std::get<int64_t>(v.data);
-        std::memcpy(dst, &val, sizeof(val));
-        break;
-    }
-    case TAG_FLOAT: {
-        double val = std::get<double>(v.data);
-        std::memcpy(dst, &val, sizeof(val));
-        break;
-    }
-    case TAG_STRING: {
-        const std::string& val = std::get<std::string>(v.data);
-        std::memcpy(dst, val.data(), val.size());
-        static_cast<char*>(dst)[val.size()] = '\0';
-        break;
-    }
-    }
-}
-
-static Variant readVariable(VMExecutionData* execData, int index) {
-    const Slot* slot = execData->translator.readSlot(index);
-    if (!slot) {
-        return { TAG_INT, static_cast<int64_t>(0) };
-    }
-
-    void* src = execData->memory.deref(slot->h);
-
-    Variant v;
-    v.type = slot->tag;
-
-    switch (slot->tag) {
-    case TAG_INT: {
-        int64_t val;
-        std::memcpy(&val, src, sizeof(val));
-        v.data = val;
-        break;
-    }
-    case TAG_FLOAT: {
-        double val;
-        std::memcpy(&val, src, sizeof(val));
-        v.data = val;
-        break;
-    }
-    case TAG_STRING: {
-        v.data = std::string(static_cast<const char*>(src));
-        break;
-    }
-    }
-
-    return v;
-}
-
-static void mutateVariable(VMExecutionData* execData, int index, bool increment) {
-    const Slot* slot = execData->translator.readSlot(index);
-    if (!slot) return;
-
-    void* ptr = execData->memory.deref(slot->h);
-
-    switch (slot->tag) {
-    case TAG_FLOAT: {
-        double val;
-        std::memcpy(&val, ptr, sizeof(val));
-        val += increment ? 1.0 : -1.0;
-        std::memcpy(ptr, &val, sizeof(val));
-        break;
-    }
-    case TAG_INT: {
-        int64_t val;
-        std::memcpy(&val, ptr, sizeof(val));
-        val += increment ? 1 : -1;
-        std::memcpy(ptr, &val, sizeof(val));
-        break;
-    }
-    case TAG_STRING:
-        break;
-    }
 }
 
 int run(

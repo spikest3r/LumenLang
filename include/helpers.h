@@ -2,6 +2,7 @@
 #include "includes.h"
 #include "types.h"
 #include "httplib.h"
+#include "vm.h"
 
 // Hash for (TypeTag as int, double value) pairs, used as the constPoolMap key.
 struct ConstPoolKeyHash {
@@ -37,3 +38,45 @@ std::string variantToString(const Variant& v);
 bool isFloatLiteral(const std::string &s);
 
 extern std::unordered_map<int, std::string> disassemblyMap;
+
+// translator helpers
+
+size_t variantByteSize(const Variant& v);
+
+void writeVariable(
+    VMExecutionData* execData,
+    int index,
+    const Variant& v
+);
+
+Variant readVariable(
+    VMExecutionData* execData,
+    int index
+);
+
+void mutateVariable(
+    VMExecutionData* execData,
+    int index,
+    bool increment
+);
+
+void writeVariable(
+    VMExecutionData* execData,
+    int index,
+    TypeTag type,
+    const std::string& str
+);
+
+void writeVariable(
+    VMExecutionData* execData,
+    int index,
+    TypeTag type,
+    int64_t val
+);
+
+void writeVariable(
+    VMExecutionData* execData,
+    int index,
+    TypeTag type,
+    double val
+);

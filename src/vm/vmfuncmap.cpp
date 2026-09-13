@@ -1,31 +1,9 @@
 #include "vm.h"
+#include "helpers.h"
 
 #include <set>
 #include <random>
 #include "httplib.h"
-
-static void writeVariable(VMExecutionData* execData, int index, TypeTag type, const std::string& str) {
-    size_t size = str.size() + 1;
-    execData->translator.allocateSlotSize(index, size, type);
-    const Slot* slot = execData->translator.readSlot(index);
-    void* dst = execData->memory.deref(slot->h);
-    std::memcpy(dst, str.data(), str.size());
-    static_cast<char*>(dst)[str.size()] = '\0';
-}
-
-static void writeVariable(VMExecutionData* execData, int index, TypeTag type, int64_t val) {
-    execData->translator.allocateSlotSize(index, sizeof(int64_t), type);
-    const Slot* slot = execData->translator.readSlot(index);
-    void* dst = execData->memory.deref(slot->h);
-    std::memcpy(dst, &val, sizeof(val));
-}
-
-static void writeVariable(VMExecutionData* execData, int index, TypeTag type, double val) {
-    execData->translator.allocateSlotSize(index, sizeof(double), type);
-    const Slot* slot = execData->translator.readSlot(index);
-    void* dst = execData->memory.deref(slot->h);
-    std::memcpy(dst, &val, sizeof(val));
-}
 
 std::set<std::string> capabilitySet = {
     "FS", "random", "HTTP"

@@ -1,6 +1,5 @@
 #pragma once
 #include "includes.h"
-#include "helpers.h"
 #include "types.h"
 
 // MemAllocator (memoryallocator.cpp)
@@ -84,6 +83,8 @@ public:
 
     const Slot* readSlot(int index); // nullptr on bad slot idx
     void allocateSlotSize(int index, size_t size, TypeTag tag);
+    size_t count();
+    void freeAll();
 private:
     MemAllocator* memory;
 
@@ -104,7 +105,6 @@ public:
     MemAllocator memory;
     AddrTranslator translator;
 
-    std::vector<Variant> variables;
     std::vector<Variant> stack;
     std::vector<CallFrame> pcStack;
 

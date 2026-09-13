@@ -1,6 +1,7 @@
 #include "vm.h"
 #include "disassembler.h"
 #include "tokenizer.h"
+#include "helpers.h"
 #include <chrono>
 #include <map>
 #include <algorithm>
@@ -301,6 +302,16 @@ int run_debug(
         } else if(command == "profiling") {
             g_profiler.enabled = !g_profiler.enabled;
             std::cout << "Profiling " << (g_profiler.enabled ? "enabled" : "disabled") << std::endl;
+        } else if(command == "memory") {
+            if(!resume) {
+                std::cout << "Execution has not started. Use 'run' first." << std::endl;
+            } else {
+                std::cout << "Memory stats\n";
+                int usedMemory = execData.memory.allocated_bytes();
+                int freePages = execData.memory.free_page_count();
+                std::cout << "Allocated memory: " << usedMemory << " bytes\n";
+                std::cout << "Free pages: " << freePages << " pages\n";
+            }
         } else if(command == "run") {
             if(resume) {
                 bool result = askYesNo("This will restart execution. Are you sure?", false);
@@ -356,47 +367,52 @@ int run_debug(
                 std::cout << "Execution finished" << std::endl;
             }
         } else if(command == "breakpoint") {
-            auto arg0 = tokens[1];
-            if(arg0 == "set") {
-                if(tokens.size() != 3) {
-                    std::cout << "Invalid argument count" << std::endl;
-                    continue;
+            if(tokens.size() > 1) {
+                auto arg0 = tokens[1];
+                if(arg0 == "set") {
+                    if(tokens.size() != 3) {
+                        std::cout << "Invalid argument count" << std::endl;
+                        continue;
+                    }
+                    int value = std::stoi(tokens[2], nullptr, 16);
+                    breakpoints.insert(value);
+                    std::cout << "Breakpoint set at " << tokens[2] << std::endl;
+                    if(g_profiler.enabled) {
+                        std::cout << "Note: profiling is enabled and cannot run while "
+                                    "breakpoints are set - disable profiling or clear "
+                                    "breakpoints before 'run'." << std::endl;
+                    }
+                } else if(arg0 == "remove") {
+                    if(tokens.size() != 3) {
+                        std::cout << "Invalid argument count" << std::endl;
+                        continue;
+                    }
+                    int value = std::stoi(tokens[2], nullptr, 16);
+                    breakpoints.erase(value);
+                    std::cout << "Breakpoint at " << tokens[2] << " removed" << std::endl;
+                } else if(arg0 == "list") {
+                    if(tokens.size() != 2) {
+                        std::cout << "Invalid argument count" << std::endl;
+                        continue;
+                    }
+                    for(const int& it: breakpoints) {
+                        std::cout << "0x" << std::hex << std::right << std::setw(8) << std::setfill('0') << it << std::endl;
+                    }
+                    std::cout << std::dec;
+                } else if(arg0 == "clear") {
+                    if(tokens.size() != 2) {
+                        std::cout << "Invalid argument count" << std::endl;
+                        continue;
+                    }
+                    bool result = askYesNo("This will clear all breakpoints. Are you sure?", false);
+                    if(!result) continue;
+                    breakpoints.clear();
+                } else {
+                    std::cout << "Invalid arguments" << std::endl;
                 }
-                int value = std::stoi(tokens[2], nullptr, 16);
-                breakpoints.insert(value);
-                std::cout << "Breakpoint set at " << tokens[2] << std::endl;
-                if(g_profiler.enabled) {
-                    std::cout << "Note: profiling is enabled and cannot run while "
-                                 "breakpoints are set - disable profiling or clear "
-                                 "breakpoints before 'run'." << std::endl;
-                }
-            } else if(arg0 == "remove") {
-                if(tokens.size() != 3) {
-                    std::cout << "Invalid argument count" << std::endl;
-                    continue;
-                }
-                int value = std::stoi(tokens[2], nullptr, 16);
-                breakpoints.erase(value);
-                std::cout << "Breakpoint at " << tokens[2] << " removed" << std::endl;
-            } else if(arg0 == "list") {
-                if(tokens.size() != 2) {
-                    std::cout << "Invalid argument count" << std::endl;
-                    continue;
-                }
-                for(const int& it: breakpoints) {
-                    std::cout << "0x" << std::hex << std::right << std::setw(8) << std::setfill('0') << it << std::endl;
-                }
-                std::cout << std::dec;
-            } else if(arg0 == "clear") {
-                if(tokens.size() != 2) {
-                    std::cout << "Invalid argument count" << std::endl;
-                    continue;
-                }
-                bool result = askYesNo("This will clear all breakpoints. Are you sure?", false);
-                if(!result) continue;
-                breakpoints.clear();
             } else {
-                std::cout << "Invalid arguments" << std::endl;
+                std::cout << "Invalid argument count" << std::endl;
+                continue;
             }
         } else if(command == "pc") {
             if(tokens.size() == 1) {
@@ -492,13 +508,14 @@ int run_debug(
                 std::cout << "Execution has not started. Use 'run' first." << std::endl;
             } else {
                 std::cout << "Variables:\n";
-                if (execData.variables.empty()) {
+                if (execData.translator.count() == 0) {
                     std::cout << "  (empty)\n";
                 }
-                for (size_t i = 0; i < execData.variables.size(); i++) {
+                for (size_t i = 0; i < execData.translator.count(); i++) {
                     auto varName = debugSymbolsValid ? debugVariablesMap[i] : std::to_string(i);
+                    auto variant = readVariable(&execData, i);
                     std::cout << "  [" << varName << "] "
-                            << variantToString(execData.variables[i]);
+                            << variantToString(variant);
                     std::cout << "\n";
                 }
             }
@@ -579,6 +596,7 @@ void printHelp() {
     std::cout << "disassemble - View full disassembly" << std::endl;
     std::cout << "debugsymbols - Specify debug symbols file" << std::endl;
     std::cout << "profiling - Toggle instruction-level profiling" << std::endl;
+    std::cout << "memory - View advanced memory metrics" << std::endl;
 }
 
 bool askYesNo(const std::string& prompt, bool defaultVal) {
@@ -611,10 +629,8 @@ void zeroExecData(VMExecutionData* execData, VMProgramData* progData) {
     execData->PC = 0;
     execData->halt = false;
 
-    execData->variables.clear();
     execData->stack.clear();
     execData->pcStack.clear();
 
-    execData->variables.clear();
-    execData->variables.resize(progData->variableCount);
+    execData->translator.freeAll();
 }

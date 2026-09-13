@@ -42,3 +42,15 @@ void AddrTranslator::allocateSlotSize(int index, size_t size, TypeTag tag) {
         slots[index].tag = tag;
     }
 }
+
+size_t AddrTranslator::count() {
+    return slots.size();
+}
+
+void AddrTranslator::freeAll() {
+    for(const auto& [idx, slot] : slots) {
+        memory->free(slot.h);
+    }
+
+    slots.clear();
+}

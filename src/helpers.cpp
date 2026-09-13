@@ -252,3 +252,125 @@ std::unordered_map<int, std::string> disassemblyMap = {
     {0xFE, "RET"},
     {0xFF, "HLT"}
 };
+
+// translator helpers
+
+size_t variantByteSize(const Variant& v) {
+    switch (v.type) {
+    case TAG_INT:
+        return sizeof(int64_t);
+    case TAG_FLOAT:
+        return sizeof(double);
+    case TAG_STRING:
+        return std::get<std::string>(v.data).size() + 1;
+    }
+    return 0;
+}
+
+void writeVariable(VMExecutionData* execData, int index, const Variant& v) {
+    size_t size = variantByteSize(v);
+    execData->translator.allocateSlotSize(index, size, v.type);
+    const Slot* slot = execData->translator.readSlot(index);
+    void* dst = execData->memory.deref(slot->h);
+
+    switch (v.type) {
+    case TAG_INT: {
+        int64_t val = std::get<int64_t>(v.data);
+        std::memcpy(dst, &val, sizeof(val));
+        break;
+    }
+    case TAG_FLOAT: {
+        double val = std::get<double>(v.data);
+        std::memcpy(dst, &val, sizeof(val));
+        break;
+    }
+    case TAG_STRING: {
+        const std::string& val = std::get<std::string>(v.data);
+        std::memcpy(dst, val.data(), val.size());
+        static_cast<char*>(dst)[val.size()] = '\0';
+        break;
+    }
+    }
+}
+
+Variant readVariable(VMExecutionData* execData, int index) {
+    const Slot* slot = execData->translator.readSlot(index);
+    if (!slot) {
+        return { TAG_INT, static_cast<int64_t>(0) };
+    }
+
+    void* src = execData->memory.deref(slot->h);
+
+    Variant v;
+    v.type = slot->tag;
+
+    switch (slot->tag) {
+    case TAG_INT: {
+        int64_t val;
+        std::memcpy(&val, src, sizeof(val));
+        v.data = val;
+        break;
+    }
+    case TAG_FLOAT: {
+        double val;
+        std::memcpy(&val, src, sizeof(val));
+        v.data = val;
+        break;
+    }
+    case TAG_STRING: {
+        v.data = std::string(static_cast<const char*>(src));
+        break;
+    }
+    }
+
+    return v;
+}
+
+void mutateVariable(VMExecutionData* execData, int index, bool increment) {
+    const Slot* slot = execData->translator.readSlot(index);
+    if (!slot) return;
+
+    void* ptr = execData->memory.deref(slot->h);
+
+    switch (slot->tag) {
+    case TAG_FLOAT: {
+        double val;
+        std::memcpy(&val, ptr, sizeof(val));
+        val += increment ? 1.0 : -1.0;
+        std::memcpy(ptr, &val, sizeof(val));
+        break;
+    }
+    case TAG_INT: {
+        int64_t val;
+        std::memcpy(&val, ptr, sizeof(val));
+        val += increment ? 1 : -1;
+        std::memcpy(ptr, &val, sizeof(val));
+        break;
+    }
+    case TAG_STRING:
+        break;
+    }
+}
+
+void writeVariable(VMExecutionData* execData, int index, TypeTag type, const std::string& str) {
+    size_t size = str.size() + 1;
+    execData->translator.allocateSlotSize(index, size, type);
+    const Slot* slot = execData->translator.readSlot(index);
+    void* dst = execData->memory.deref(slot->h);
+    std::memcpy(dst, str.data(), str.size());
+    static_cast<char*>(dst)[str.size()] = '\0';
+}
+
+void writeVariable(VMExecutionData* execData, int index, TypeTag type, int64_t val) {
+    execData->translator.allocateSlotSize(index, sizeof(int64_t), type);
+    const Slot* slot = execData->translator.readSlot(index);
+    void* dst = execData->memory.deref(slot->h);
+    std::memcpy(dst, &val, sizeof(val));
+}
+
+void writeVariable(VMExecutionData* execData, int index, TypeTag type, double val) {
+    execData->translator.allocateSlotSize(index, sizeof(double), type);
+    const Slot* slot = execData->translator.readSlot(index);
+    void* dst = execData->memory.deref(slot->h);
+    std::memcpy(dst, &val, sizeof(val));
+}
