@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <cctype>
 
+namespace {
+
 std::string trim_tabs(const std::string& str) {
     const std::string targets = "\t";
     size_t start = str.find_first_not_of(targets);
@@ -11,79 +13,48 @@ std::string trim_tabs(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
+bool isIdentChar(unsigned char c) {
+    return std::isalnum(c) || c == '_';
+}
+
+bool isOperandEndToken(const std::string& t) {
+    if (t.empty()) return false;
+    if (t == "(" || t == "," || t == "+" || t == "-" || t == "*" || t == "/" ||
+        t == "%" || t == " .. ") {
+        return false;
+    }
+    return true;
+}
+
+} // namespace
+
 std::vector<std::string> tokenizeFormula(std::string formula) {
     std::vector<std::string> tokens;
     std::string token = "";
     bool isQuoteOpen = false;
-    trim_tabs(formula);
-    for(int i = 0; i < formula.size(); i++) {
+
+    formula = trim_tabs(formula);
+
+    auto flush = [&]() {
+        if (!token.empty()) {
+            tokens.push_back(token);
+            token.clear();
+        }
+    };
+
+    const size_t n = formula.size();
+    for (size_t i = 0; i < n; i++) {
         char c = formula[i];
-        if (c == '(' || c == ')') {
-            if(!isQuoteOpen) {
-                if (token.length() > 0) tokens.push_back(token);
-                tokens.push_back(std::string(1, c));
-                token = "";
+
+        if (isQuoteOpen) {
+            if (c == '\'') {
+                isQuoteOpen = false;
+                tokens.push_back(token + '\'');
+                token.clear();
                 continue;
             }
-        } else if (c == ',') {
-            if(!isQuoteOpen) {
-                if (token.length() > 0) tokens.push_back(token);
-                tokens.push_back(",");
-                token = "";
-                continue;
-            }
-        } else if (c == '.' && !isQuoteOpen) {
-            // '.' inside a numeric literal being built (e.g. "3" + "." -> "3.14") stays glued
-            bool numericContext = !token.empty() &&
-                std::all_of(token.begin(), token.end(), [](unsigned char ch) { return std::isdigit(ch); });
-            if (numericContext) {
-                token += c;
-                continue;
-            }
-            // otherwise '.' starts/continues a concat operator '..'
-            if (i + 1 < formula.size() && formula[i + 1] == '.') {
-                if (token.length() > 0) tokens.push_back(token);
-                tokens.push_back(" .. ");
-                token = "";
-                i++; // consume both dots
-                continue;
-            }
-            // lone '.' with no numeric context and no second dot: treat as ordinary char
-            token += c;
-            continue;
-        } else if (c == '*' && token.empty() && !isQuoteOpen &&
-                   (tokens.empty() || tokens.back() == "(" || tokens.back() == "," ||
-                    tokens.back() == "+" || tokens.back() == "-" || tokens.back() == "*" ||
-                    tokens.back() == "/" || tokens.back() == "%" || tokens.back() == " .. ")) {
-            // dereference prefix: '*' at start of an operand position, not after a value
-            token += c;
-            continue;
-        } else if (c == '+' || c == '-' || c == '*' || c == '/' || c == '%') {
-            if(!isQuoteOpen) {
-                if (token.length() > 0) tokens.push_back(token);
-                tokens.push_back(std::string(1, c));
-                token = "";
-                continue;
-            }
-        } else if (c == ' ') {
-            if(!isQuoteOpen) {
-                if (token.length() > 0) tokens.push_back(token);
-                token = "";
-                continue;
-            }
-        } else if(c == '\'') {
-            isQuoteOpen = !isQuoteOpen;
-            if(!isQuoteOpen) {
-                if (token.length() > 0) tokens.push_back(token + '\'');
-                token = "";
-                continue;
-            }
-        } else if(c == '#') {
-            // comment
-            break;
-        } else if(c == '\\') {
-            if(isQuoteOpen) {
-                char next = formula[i+1];
+            if (c == '\\' && i + 1 < n) {
+                char next = formula[i + 1];
                 switch (next) {
                     case 'n': token += '\n'; break;
                     case 't': token += '\t'; break;
@@ -94,11 +65,92 @@ std::vector<std::string> tokenizeFormula(std::string formula) {
                 i++;
                 continue;
             }
+            token += c;
+            continue;
+        }
+
+        if (c == '\'') {
+            flush();
+            isQuoteOpen = true;
+            token += '\'';   // capture opening quote
+            continue;
+        }
+
+        if (c == '(' || c == ')' || c == ',') {
+            flush();
+            tokens.push_back(std::string(1, c));
+            continue;
+        }
+
+        if (c == '#') {
+            break;
+        }
+
+        if (std::isspace(static_cast<unsigned char>(c))) {
+            flush();
+            continue;
+        }
+
+        if (c == '.') {
+            // '.' inside a numeric literal being built (e.g. "3" + "." -> "3.14") stays glued
+            bool numericContext = !token.empty() &&
+                std::all_of(token.begin(), token.end(),
+                            [](unsigned char ch) { return std::isdigit(ch); });
+            if (numericContext) {
+                token += c;
+                continue;
+            }
+            // otherwise '.' starts/continues a concat operator '..'
+            if (i + 1 < n && formula[i + 1] == '.') {
+                flush();
+                tokens.push_back(" .. ");
+                i++; // consume both dots
+                continue;
+            }
+            // lone '.' with no numeric context and no second dot: treat as ordinary char
+            flush();
+            token += c;
+            flush();
+            continue;
+        }
+
+        if (c == '*' && token.empty() && !isOperandEndToken(tokens.empty() ? "" : tokens.back())) {
+            // dereference prefix: '*' at start of an operand position
+            token += c;
+            continue;
+        }
+
+        if (c == '+' || c == '-' || c == '*' || c == '/' || c == '%') {
+            flush();
+            tokens.push_back(std::string(1, c));
+            continue;
+        }
+
+        bool tokenIsNumericInProgress = !token.empty() && token.back() == '.' &&
+            token.size() >= 2 &&
+            std::all_of(token.begin(), token.end() - 1,
+                        [](unsigned char ch) { return std::isdigit(ch); });
+
+        if (isIdentChar(static_cast<unsigned char>(c))) {
+            if (!token.empty() && !isIdentChar(static_cast<unsigned char>(token.back())) &&
+                !tokenIsNumericInProgress) {
+                flush();
+            }
+            token += c;
+            continue;
+        }
+
+        if (!token.empty() && isIdentChar(static_cast<unsigned char>(token.back()))) {
+            flush();
         }
         token += c;
     }
-    if (token.length() != 0) {
-        tokens.push_back(token);
+
+    if (isQuoteOpen) {
+        flush();
+    } else {
+        flush();
     }
+
     return tokens;
 }
