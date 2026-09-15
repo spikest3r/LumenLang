@@ -13,6 +13,18 @@ struct ConstPoolKeyHash {
     }
 };
 
+struct PendingRoutineCall {
+    std::string name;
+    int location;       // byte offset of the 4-byte placeholder, within the buffer it was written to
+    int routineIndex;   // -1 if the call site is in main code, >= 0 if inside that routine
+    int argCount;
+};
+
+struct RoutineSignature {
+    int index;     // key into subroutineBytecode / routineOffsets later
+    int argCount;
+};
+
 struct CompilerData {
     std::vector<uint8_t> bytecode;
 
@@ -23,6 +35,10 @@ struct CompilerData {
     std::unordered_map<std::string, int> variableMap;
     std::unordered_map<std::string, int> stringPoolMap;
     std::unordered_map<std::pair<int, double>, int, ConstPoolKeyHash> constPoolMap;
+
+    std::unordered_map<std::string, RoutineSignature> routineList;
+    std::vector<PendingRoutineCall> pendingRoutineCalls;
+    int currentRoutineIndex = -1;
 };
 
 bool splitUrl(const std::string& url, std::string& hostPart, std::string& pathPart);

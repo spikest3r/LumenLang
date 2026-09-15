@@ -4,6 +4,11 @@
 #include "types.h"
 #include "tokenizer.h"
 
+struct Function {
+    uint8_t opcode;
+    uint8_t argCount;
+};
+
 int compile(std::string fileName,
     CompilerData* compilerData,
     bool verbose = false, bool debugInfo = false

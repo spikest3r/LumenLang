@@ -23,6 +23,7 @@ typedef enum {
     NONE,
     ASSIGN,
     FUNC_CALL,
+    ROUTINE_CALL,
     PUSH_STACK,
     LABEL,
     JUMP,
