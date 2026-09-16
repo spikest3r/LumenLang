@@ -40,6 +40,8 @@ struct CompilerData {
     std::unordered_map<std::string, RoutineSignature> routineList;
     std::vector<PendingRoutineCall> pendingRoutineCalls;
     int currentRoutineIndex = -1;
+
+    std::string debugData;
 };
 
 bool splitUrl(const std::string& url, std::string& hostPart, std::string& pathPart);

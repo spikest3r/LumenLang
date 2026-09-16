@@ -1,16 +1,11 @@
 #include "disassembler.h"
 
-bool loadDebugInfo(const std::string& fileName,
+bool loadDebugInfo(const std::string& data,
     std::unordered_map<int, std::string>& variables,
     std::unordered_map<std::string, RoutineInfo>& routines,
     std::unordered_map<int, std::string>& funcList
 ) {
-    std::ifstream file(fileName);
-
-    if (!file) {
-        std::cerr << "Error: Could not open debug file " << fileName << std::endl;
-        return false;
-    }
+    std::istringstream file(data);
 
     std::string line;
 
@@ -58,7 +53,6 @@ bool loadDebugInfo(const std::string& fileName,
         }
     }
 
-    std::cout << "Debug info loaded from " << fileName << std::endl;
     return true;
 }
 
@@ -75,8 +69,7 @@ std::unordered_map<uint32_t, std::string> buildRoutineStarts(
 void disassemble(std::vector<uint8_t> bytecode,
     std::vector<std::string> stringPool,
     std::vector<double> constPool,
-    std::string debugFile,
-    bool* debugSymbolsLoaded,
+    std::string debugData,
     int vmPC)
 {
     int PC = 0;
@@ -88,16 +81,11 @@ void disassemble(std::vector<uint8_t> bytecode,
     std::unordered_map<uint32_t, std::string> routineStarts;
     bool hasDebugData = false;
 
-    if (!debugFile.empty()) {
-        std::cout << "Loading debug info from " << debugFile << std::endl;
-        bool success = loadDebugInfo(debugFile, variables_debug, routines_debug, funcList_debug);
+    if (!debugData.empty()) {
+        bool success = loadDebugInfo(debugData, variables_debug, routines_debug, funcList_debug);
         if (success) {
             routineStarts = buildRoutineStarts(routines_debug);
             hasDebugData = true;
-            if (debugSymbolsLoaded) *debugSymbolsLoaded = true;
-        }
-        else {
-            if (debugSymbolsLoaded) *debugSymbolsLoaded = false;
         }
     }
 

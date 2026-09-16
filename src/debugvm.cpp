@@ -263,7 +263,8 @@ static void printProfilingReport() {
 // ---------------------------------------------------------------------------
 
 int run_debug(
-    VMProgramData* progData
+    VMProgramData* progData,
+    const std::string& debugData
 ) {
     std::cout << "Debugger active. 'help' for list of commands" << std::endl;
 
@@ -272,13 +273,20 @@ int run_debug(
 
     // debugger
     std::unordered_set<int> breakpoints;
-    bool debugSymbolsSpecified = false;
-    std::string debugSymbolsFile;
     bool debugSymbolsValid = false;
 
     std::unordered_map<int, std::string> debugVariablesMap;
     std::unordered_map<std::string, RoutineInfo> debugRoutinesMap;
     std::unordered_map<int, std::string> debugFuncListMap;
+
+    if(!debugData.empty()) {
+        debugSymbolsValid = loadDebugInfo(
+            debugData,
+            debugVariablesMap,
+            debugRoutinesMap,
+            debugFuncListMap
+        );
+    }
 
     bool resume = false;
 
@@ -523,25 +531,11 @@ int run_debug(
         else if(command == "disassemble") {
             disassemble(
                 progData->bytecode, progData->stringPool, progData->constPool,
-                debugSymbolsSpecified ? debugSymbolsFile : "",
-                nullptr, resume ? execData.PC : -1
+                debugSymbolsValid ? debugData : "",
+                resume ? execData.PC : -1
             );
-        } else if(command == "debugsymbols") {
-            std::cout << "Please specify .dbg file for this binary" << std::endl;
-            std::cout << ": ";
-            std::cin >> debugSymbolsFile;
-            debugSymbolsSpecified = true;
-
-            debugVariablesMap.clear();
-            debugRoutinesMap.clear();
-            debugFuncListMap.clear();
-
-            debugSymbolsValid = loadDebugInfo(debugSymbolsFile,
-                debugVariablesMap,
-                debugRoutinesMap,
-                debugFuncListMap
-            );
-        } else if(command == "quit" || command == "exit") {
+        }
+        else if(command == "quit" || command == "exit") {
             bool confirm = true;
             if(resume) {
                 confirm = askYesNo("Script is still running. Proceed?");

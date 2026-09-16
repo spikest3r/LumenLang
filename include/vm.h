@@ -126,7 +126,8 @@ int run(
 );
 
 int run_debug(
-    VMProgramData* progData
+    VMProgramData* progData,
+    const std::string& debugData
 );
 
 int execute(

@@ -96,27 +96,28 @@ int finalizeCompile(CompileState& state, CompilerData* compilerData,
         }
     }
 
-    if (debugInfo && fileName.size() > 0) {
-        std::ofstream debugFile(fileName + ".bin.dbg");
-        if (debugFile.is_open()) {
-            // Write variable names and their indices
-            debugFile << "variables" << std::endl;
-            for (const auto& var : compilerData->variableMap) {
-                debugFile << var.first << " " << var.second << std::endl;
-            }
-            // Write subroutine names, their bytecode offsets and bytecode length
-            debugFile << "routines" << std::endl;
-            for (const auto& sub : state.subroutineIndexMap) {
-                debugFile << sub.first << std::endl;
-                debugFile << routineOffsets[sub.second] << std::endl;
-                debugFile << state.subroutineBytecode[sub.second].size() << std::endl;
-            }
-            // Write exec functions
-            debugFile << "exec" << std::endl;
-            for (const auto& func : funcList) {
-                debugFile << func.first << " " << func.second.opcode << std::endl;
-            }
+    if (debugInfo) {
+        std::stringstream debugFile;
+
+        // Write variable names and their indices
+        debugFile << "variables" << std::endl;
+        for (const auto& var : compilerData->variableMap) {
+            debugFile << var.first << " " << var.second << std::endl;
         }
+        // Write subroutine names, their bytecode offsets and bytecode length
+        debugFile << "routines" << std::endl;
+        for (const auto& sub : state.subroutineIndexMap) {
+            debugFile << sub.first << std::endl;
+            debugFile << routineOffsets[sub.second] << std::endl;
+            debugFile << state.subroutineBytecode[sub.second].size() << std::endl;
+        }
+        // Write exec functions
+        debugFile << "exec" << std::endl;
+        for (const auto& func : funcList) {
+            debugFile << func.first << " " << func.second.opcode << std::endl;
+        }
+
+        compilerData->debugData = debugFile.str();
     }
 
     compilerData->variableCount = static_cast<int>(compilerData->variableMap.size());

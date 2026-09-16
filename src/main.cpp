@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
         std::cout << "  --compile                Compile the source file (default)" << std::endl;
         std::cout << "  --run                    Run the compiled bytecode (default)" << std::endl;
         std::cout << "  --disassemble            Disassemble the compiled bytecode" << std::endl;
-        std::cout << "  --dbgsym                 Generate debug symbols information file" << std::endl;
+        std::cout << "  --no-debug               Disable inline debug symbol generation" << std::endl;
         std::cout << "  --debugger               Run file in debugger mode" << std::endl;
         std::cout << "If no options are provided, the program will compile and run the source file." << std::endl;
         return 0;
@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
     bool compileFlag = false;
     bool runFlag = false;
     bool disassembleFlag = false;
-    bool debugInfo = false;
+    bool debugInfo = true;
     bool debuggerActive = false;
 
     if(argc > 2) {
@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
             else if(strcmp(arg, "--compile") == 0) compileFlag = true;
             else if(strcmp(arg, "--disassemble") == 0) disassembleFlag = true;
             else if(strcmp(arg, "--run") == 0) runFlag = true;
-            else if(strcmp(arg, "--dbgsym") == 0) debugInfo = true;
+            else if(strcmp(arg, "--no-debug") == 0) debugInfo = false;
             else if(strcmp(arg, "--debugger") == 0) debuggerActive = true;
             else {
                 std::cerr << "Unknown argument: " << arg << std::endl;
@@ -128,8 +128,7 @@ int main(int argc, char** argv) {
     }
 
     if(
-        (debuggerActive && compileFlag && !runFlag) ||
-        (debugInfo && !compileFlag)
+        (debuggerActive && compileFlag && !runFlag)
     ) {
         std::cerr << "Invalid flag combination" << std::endl;
         return -1;
@@ -138,7 +137,7 @@ int main(int argc, char** argv) {
     if(disassembleFlag) {
         BinaryProgram inProg;
         inProg.load(file_name);
-        disassemble(inProg.bytecode, inProg.stringPool, inProg.constPool, file_name + ".dbg");
+        disassemble(inProg.bytecode, inProg.stringPool, inProg.constPool, inProg.debugData);
     }
 
     if(compileFlag) {
@@ -168,6 +167,7 @@ int main(int argc, char** argv) {
         outProg.stringPool = data.stringPool;
         outProg.constPool = data.constPool;
         outProg.variableCount = data.variableCount;
+        outProg.debugData = data.debugData;
         outProg.save(file_name + ".bin");
     }
 
@@ -187,7 +187,8 @@ int main(int argc, char** argv) {
 
         if(debuggerActive) {
             status = run_debug(
-                &progData
+                &progData,
+                inProg.debugData
             );
         } else {
             if(verboseFlag) std::cout << "Executing..." << std::endl;

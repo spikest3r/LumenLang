@@ -8,15 +8,14 @@ struct RoutineInfo
     uint32_t length;
 };
 
-void disassemble(std::vector<uint8_t> bytecode, 
-    std::vector<std::string> stringPool, 
+void disassemble(std::vector<uint8_t> bytecode,
+    std::vector<std::string> stringPool,
     std::vector<double> constPool,
-    std::string debugFile = "", 
-    bool* debugSymbolsLoaded = nullptr,
+    std::string debugData,
     int vmPC = -1
 );
 
-bool loadDebugInfo(const std::string& fileName,
+bool loadDebugInfo(const std::string& data,
     std::unordered_map<int, std::string>& variables,
     std::unordered_map<std::string, RoutineInfo>& routines,
     std::unordered_map<int, std::string>& funcList
