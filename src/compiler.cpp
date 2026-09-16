@@ -57,38 +57,40 @@ static const std::unordered_map<ConditionOp, uint8_t> condOpcodeMap = {
 };
 
 std::unordered_map<std::string, Function> funcList = {
-    {"println",   {0x01,1}},
-    {"print",     {0x02,1}},
-    {"inputInt",  {0x03,1}},
-    {"inputStr",  {0x04,1}},
-    {"str2int",   {0x05,2}},
-    {"int2str",   {0x06,2}},
-    {"str2float", {0x07,2}},
-    {"float2str", {0x08,2}},
-    {"assertCapability", {0xA0,1}},
-    {"openFile", {0xA1,2}},
-    {"writeFile", {0xA2, 2}},
-    {"readFile", {0xA3, 2}},
-    {"closeFile", {0xA4, 1}},
-    {"randomSeed", {0xA5, 1}},
-    {"random", {0xA6, 1}},
-    {"randomRange", {0xA7, 3}},
-    {"httpRequest", {0xA8, 6}},
-    {"strlen", {0xA9, 2}},
-    {"substr", {0xAA, 4}},
-    {"strfind", {0xAB, 3}},
-    {"strcase", {0xAC, 3}},
-    {"trim", {0xAD, 2}}
+    {"println",   {0x01,1,0}},
+    {"print",     {0x02,1,0}},
+    {"inputInt",  {0x03,1,1}},
+    {"inputStr",  {0x04,0,1}},
+    {"str2int",   {0x05,1,1}},
+    {"int2str",   {0x06,1,1}},
+    {"str2float", {0x07,1,1}},
+    {"float2str", {0x08,1,1}},
+    {"assertCapability", {0xA0,1,0}},
+    {"openFile", {0xA1,1,1}},
+    {"writeFile", {0xA2, 2,0}},
+    {"readFile", {0xA3, 1,1}},
+    {"closeFile", {0xA4, 1,0}},
+    {"randomSeed", {0xA5, 1,0}},
+    {"random", {0xA6, 0,1}},
+    {"randomRange", {0xA7, 2,1}},
+    {"httpRequest", {0xA8, 5, 1}},
+    {"strlen", {0xA9, 1,1}},
+    {"substr", {0xAA, 3,1}},
+    {"strfind", {0xAB, 2,1}},
+    {"strcase", {0xAC, 2,1}},
+    {"trim", {0xAD, 1,1}}
 };
 
 static void prescanRoutines(const std::vector<std::string>& lines, CompilerData* compilerData) {
     int routineIndex = 0;
     for (const auto& line : lines) {
         auto tokens = tokenizeFormula(line);
-        if (tokens.empty() || tokens[0] != "routine") continue;
+        if (tokens.empty() || (tokens[0] != "routine" && tokens[0] != "function")) continue;
         if (tokens.size() < 2) continue; // malformed; let the main pass report the error
 
         const std::string& name = tokens[1];
+
+        bool returnable = tokens[0] == "function";
 
         int commas = 0;
         bool inParens = false;
@@ -104,7 +106,7 @@ static void prescanRoutines(const std::vector<std::string>& lines, CompilerData*
         }
         int argCount = sawAnyArgToken ? commas + 1 : 0;
 
-        compilerData->routineList[name] = RoutineSignature{routineIndex, argCount};
+        compilerData->routineList[name] = RoutineSignature{routineIndex, argCount, returnable};
         routineIndex++;
     }
 }
@@ -172,6 +174,7 @@ int compileFromStream(std::istream& input,
 
     int lineIndex = 1;
     bool inRoutine = false;
+    bool inFunction = false;
     int routineIndex = -1;
     int routineCount = 0;
 
@@ -196,10 +199,12 @@ int compileFromStream(std::istream& input,
         int conditionArgs = 0;
         int varIndex_assign = 0;
         ConditionOp condOp = COP_NONE;
-        std::vector<uint8_t>& bytecode = inRoutine ? subroutineBytecode[routineIndex] : compilerData->bytecode;
-        compilerData->currentRoutineIndex = inRoutine ? routineIndex : -1;
+        bool isMainBody = !(inRoutine || inFunction);
+        std::vector<uint8_t>& bytecode = isMainBody ? compilerData->bytecode : subroutineBytecode[routineIndex];
+        compilerData->currentRoutineIndex = isMainBody ? -1 : routineIndex;
         std::vector<std::string> tokenStack; // for temporary holds, cleared on every new line
         bool argsOpen = false;
+        int callParenDepth = 0;
         std::string routineToCall = "";
 
         for (const auto& token : tokens) {
@@ -412,7 +417,7 @@ int compileFromStream(std::istream& input,
                 }
                 op = SUBROUTINE;
                 if (inRoutine) {
-                    printError("Nested routines are not allowed", lineIndex);
+                    printError("Nested routines/functions are not allowed", lineIndex);
                     return -1;
                 }
                 inRoutine = true;
@@ -432,12 +437,39 @@ int compileFromStream(std::istream& input,
                 routineIndex = -1;
                 continue;
             }
+            else if (token == "function") {
+                if (op != NONE) {
+                    printError("Syntax error", lineIndex);
+                    return -1;
+                }
+                op = SUBROUTINE;
+                if (inFunction) {
+                    printError("Nested routines/functions are not allowed", lineIndex);
+                    return -1;
+                }
+                inFunction = true;
+                continue;
+            }
+            else if (token == "endfunction") {
+                if (op != NONE) {
+                    printError("Syntax error", lineIndex);
+                    return -1;
+                }
+                if (!inFunction) {
+                    printError("Unexpected 'endfunction' (no matching 'function')", lineIndex);
+                    return -1;
+                }
+                bytecode.push_back(0xFE); // RET
+                inFunction = false;
+                routineIndex = -1;
+                continue;
+            }
             else if (token == "return") {
                 if (op != NONE) {
                     printError("Syntax error", lineIndex);
                     return -1;
                 }
-                if (!inRoutine) {
+                if (!inFunction) {
                     printError("'return' is not allowed outside routine block", lineIndex);
                     return -1;
                 }
@@ -466,6 +498,9 @@ int compileFromStream(std::istream& input,
             }
             else {
                 if (op == NONE) {
+                    if (tokens.size() > 1 && tokens[1] == "=") {
+                        continue;
+                    }
                     auto it = funcList.find(token);
                     if (it != funcList.end()) {
                         op = FUNC_CALL;
@@ -480,6 +515,11 @@ int compileFromStream(std::istream& input,
                         op = ROUTINE_CALL;
 
                         routineToCall = tokens[0];
+                        funcArgs = 0;
+                        auto sigIt = compilerData->routineList.find(routineToCall);
+                        requiredFuncArgs = (sigIt != compilerData->routineList.end()) ? sigIt->second.argCount : 0;
+                        int currRoutine = !isMainBody ? routineIndex : -1;
+                        unresolvedRoutineCalls.push_back({ routineToCall, 0, lineIndex, currRoutine, 0 });
                     } 
                     continue;
                 }
@@ -509,12 +549,13 @@ int compileFromStream(std::istream& input,
             {
                 if(token == "(") {
                     if(argsOpen) {
-                        // error
-                        printError("Unexpected \'(\'", lineIndex);
-                        return -1;
+                        callParenDepth++;
+                        functionArgument += token;
+                        break;
                     }
                     functionArgument.clear();
                     argsOpen = true;
+                    callParenDepth = 0;
                     break;
                 } else if (token == ")") {
                     if(!argsOpen) {
@@ -522,10 +563,15 @@ int compileFromStream(std::istream& input,
                         printError("Unexpected \')\'", lineIndex);
                         return -1;
                     }
+                    if(callParenDepth > 0) {
+                        callParenDepth--;
+                        functionArgument += token;
+                        break;
+                    }
                     argsOpen = false;
                     // arguments end
                 } else if (token == ",") {
-                    if(argsOpen) {
+                    if(argsOpen && callParenDepth == 0) {
                         if(op == SUBROUTINE) {
                             // TODO: add checks for expressions to prevent those
                             subroutineInfoMap[routineIndex].args.push_back(functionArgument);
@@ -555,7 +601,7 @@ int compileFromStream(std::istream& input,
             break;
             case LABEL:
             {
-                if (inRoutine) {
+                if (!isMainBody) {
                     routineLabels[routineIndex][keyword] = static_cast<int>(bytecode.size());
                 }
                 else {
@@ -566,11 +612,11 @@ int compileFromStream(std::istream& input,
             break;
             case JUMP:
             {
-                int currentCtx = inRoutine ? routineIndex : -1;
+                int currentCtx = !isMainBody ? routineIndex : -1;
                 bool found = false;
                 int targetOffset = 0;
 
-                if (inRoutine) {
+                if (!isMainBody) {
                     auto& rMap = routineLabels[routineIndex];
                     auto it = rMap.find(keyword);
                     if (it != rMap.end()) {
@@ -678,9 +724,14 @@ int compileFromStream(std::istream& input,
 
             if(op != SUBROUTINE) {
                 if(funcArgs != requiredFuncArgs) {
-                    auto it = std::find_if(funcList.begin(), funcList.end(),
-                        [&](const auto& p) { return p.second.opcode == funcIndex; });
-                    std::string key = (it != funcList.end()) ? it->first : "<unknown>";
+                    std::string key;
+                    if(op == FUNC_CALL) {
+                        auto it = std::find_if(funcList.begin(), funcList.end(),
+                            [&](const auto& p) { return p.second.opcode == funcIndex; });
+                        key = (it != funcList.end()) ? it->first : "<unknown>";
+                    } else {
+                        key = routineToCall;
+                    }
                     std::stringstream ss;
                     ss << "argument count mismatch for '" << key << "': expected " 
                         << requiredFuncArgs << ", got " << funcArgs << "\n";
@@ -696,8 +747,7 @@ int compileFromStream(std::istream& input,
                     int loc = static_cast<int>(bytecode.size());
                     emitUint32(bytecode, 0x00000000); // 4-byte placeholder
 
-                    int currRoutine = inRoutine ? routineIndex : -1;
-                    unresolvedRoutineCalls.push_back({ routineToCall, loc, lineIndex, currRoutine, 0 });
+                    unresolvedRoutineCalls.back().location = loc;
                 }
             } else {
                 // POP args into variables

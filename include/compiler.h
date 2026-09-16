@@ -7,6 +7,7 @@
 struct Function {
     uint8_t opcode;
     uint8_t argCount;
+    bool returnable;
 };
 
 int compile(std::string fileName,

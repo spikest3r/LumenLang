@@ -396,7 +396,12 @@ int execute(
         std::string result;
         for (int i = 0; i < strCount; i++) {
             Variant strVar = execData->stack.back(); execData->stack.pop_back();
-            std::string str = std::get<std::string>(strVar.data);
+            std::string str;
+            if (auto* p = std::get_if<std::string>(&strVar.data)) {
+                str = *p;
+            } else {
+                str = ""; // or whatever default makes sense
+            }
             result = str + result;
         }
         execData->stack.push_back({ TAG_STRING, result });

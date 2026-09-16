@@ -275,12 +275,22 @@ static void evalRPN(const std::vector<std::string> &rpn, CompilerData* data, std
 
             auto fIt = funcList.find(name);
             if (fIt != funcList.end()) {
+                if(!fIt->second.returnable) {
+                    throw std::runtime_error(std::format(
+                        "error: '{}' does not return a value", name
+                    ));
+                }
                 bytecode.push_back(0x04); // call native function
                 bytecode.push_back(static_cast<uint8_t>(fIt->second.opcode));
             } else {
                 auto rIt = data->routineList.find(name);
                 if (rIt == data->routineList.end()) {
                     throw std::runtime_error("unknown function or routine: " + name);
+                }
+                if(!rIt->second.returnable) {
+                    throw std::runtime_error(std::format(
+                        "error: '{}' does not return a value", name
+                    ));
                 }
 
                 bytecode.push_back(0x07); // CALL32

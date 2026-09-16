@@ -23,6 +23,7 @@ struct PendingRoutineCall {
 struct RoutineSignature {
     int index;     // key into subroutineBytecode / routineOffsets later
     int argCount;
+    bool returnable = false;
 };
 
 struct CompilerData {
