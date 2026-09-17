@@ -21,7 +21,7 @@ const std::unordered_map<ConditionOp, uint8_t> condOpcodeMap = {
 std::unordered_map<std::string, Function> funcList = {
     {"println",   {0x01,1,0}},
     {"print",     {0x02,1,0}},
-    {"inputInt",  {0x03,1,1}},
+    {"inputInt",  {0x03,0,1}},
     {"inputStr",  {0x04,0,1}},
     {"str2int",   {0x05,1,1}},
     {"int2str",   {0x06,1,1}},
