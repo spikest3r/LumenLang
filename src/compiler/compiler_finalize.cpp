@@ -1,10 +1,13 @@
 #include "compiler_internal.h"
 
 int finalizeCompile(CompileState& state, CompilerData* compilerData,
-    bool debugInfo, const std::string& fileName
+    bool debugInfo, const std::string& fileName, bool subscript
 ) {
-    // Appending HALT instruction to main bytecode
-    compilerData->bytecode.push_back(0xFF); // HALT
+    // if its subcript, skip HALT append
+    if(!subscript) {
+        // Appending HALT instruction to main bytecode
+        compilerData->bytecode.push_back(0xFF); // HALT
+    }
 
     // Resolve Main Program Jumps
     for (const auto& it : state.unresolvedJumps) {
@@ -19,6 +22,8 @@ int finalizeCompile(CompileState& state, CompilerData* compilerData,
             }
         }
     }
+
+    if(subscript) return 0;
 
     // Append Subroutine Bytecodes and Calculate Final Absolute Offsets
     std::unordered_map<int, int> routineOffsets;

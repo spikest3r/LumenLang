@@ -60,6 +60,8 @@ struct CompileState {
     int requiredFuncArgs = 0;
 
     int loopDepth = 0;
+
+    int importDepth = 0; // used to prevent recursive import lock-up
 };
 
 extern std::unordered_map<std::string, Function> funcList;
@@ -80,4 +82,4 @@ int compileLine(const std::string& line, CompileState& state, CompilerData* comp
 // Resolves jumps/calls, merges subroutine bytecode into the main bytecode, and
 // optionally writes the debug info file. Returns -1 on error, 0 on success.
 int finalizeCompile(CompileState& state, CompilerData* compilerData,
-    bool debugInfo, const std::string& fileName);
+    bool debugInfo, const std::string& fileName, bool subscript = false);

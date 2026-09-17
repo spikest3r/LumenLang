@@ -2,7 +2,7 @@
 
 int compileFromStream(std::istream& input,
     CompilerData* compilerData,
-    bool verbose, bool debugInfo, std::string fileName
+    bool verbose, bool debugInfo, std::string fileName, CompileState* prevState = nullptr
 ) {
     std::string line;
 
@@ -12,25 +12,30 @@ int compileFromStream(std::istream& input,
     }
     prescanRoutines(allLines, compilerData);
 
-    CompileState state;
+    std::optional<CompileState> localState;
+
+    CompileState& state =
+        prevState ? *prevState : localState.emplace();
+
+    bool subscript = prevState != nullptr;
 
     for (const std::string& currentLine : allLines) {
         int result = compileLine(currentLine, state, compilerData, verbose, debugInfo);
         if (result != 0) return result;
     }
 
-    return finalizeCompile(state, compilerData, debugInfo, fileName);
+    return finalizeCompile(state, compilerData, debugInfo, fileName, subscript);
 }
 
 int compileFromFile(std::ifstream& file,
     CompilerData* compilerData,
-    bool verbose, bool debugInfo, std::string fileName
+    bool verbose, bool debugInfo, std::string fileName, CompileState* prevState
 ) {
     if (!file.is_open()) {
         std::cerr << "File is not open" << std::endl;
         return -1;
     }
-    return compileFromStream(file, compilerData, verbose, debugInfo, fileName);
+    return compileFromStream(file, compilerData, verbose, debugInfo, fileName, prevState);
 }
 
 int compileFromText(const std::string& text,
@@ -50,7 +55,7 @@ int compile(std::string fileName,
         std::cerr << "Could not open file: " << fileName << std::endl;
         return -1;
     }
-    int result = compileFromFile(file, compilerData, verbose, debugInfo, fileName);
+    int result = compileFromFile(file, compilerData, verbose, debugInfo, fileName, nullptr);
     file.close();
     return result;
 }

@@ -315,6 +315,35 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
             bytecode.push_back(0xFE); // RET
             break;
         }
+        else if(token == "import") 
+        {
+            // check syntax first
+            if(tokens.size() != 2 || op != NONE) {
+                printError("Syntax error", state.lineIndex);
+                return -1;
+            }
+
+            // check depth
+            if(state.importDepth > 4) {
+                printError("Reached import depth of 4", state.lineIndex);
+                return -1;
+            }
+
+            // recursively compile next script
+            state.importDepth++;
+            std::string file = tokens[1];
+            replaceAll(file, "'", "");
+            std::ifstream fileStream(file);
+            int status = compileFromFile(fileStream, compilerData, verbose, debugInfo, file, &state);
+            state.importDepth--;
+            if(status != 0) {
+                printError("Script compilation has failed", state.lineIndex);
+                return -1;
+            }
+
+            // bytecode is already emitted into main part
+            break;
+        }
         else {
             if (op == NONE) {
                 if (tokens.size() > 1 && tokens[1] == "=") {
