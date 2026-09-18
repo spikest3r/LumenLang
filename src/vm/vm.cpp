@@ -342,16 +342,29 @@ int execute(
         int falseIndex = progData->bytecode[execData->PC + 1];
 
         bool result = false;
-        double av = getNumeric(a);
-        double bv = getNumeric(b);
 
-        switch (opcode) {
-        case 0xB0: result = av == bv; break;
-        case 0xB1: result = av > bv; break;
-        case 0xB2: result = av < bv; break;
-        case 0xB3: result = av >= bv; break;
-        case 0xB4: result = av <= bv; break;
-        case 0xB5: result = av != bv; break;
+        if (a.type == TAG_STRING && b.type == TAG_STRING) {
+            std::string as = std::get<std::string>(a.data);
+            std::string bs = std::get<std::string>(b.data);
+            switch (opcode) {
+            case 0xB0: result = as == bs; break;
+            case 0xB1: result = as > bs; break;
+            case 0xB2: result = as < bs; break;
+            case 0xB3: result = as >= bs; break;
+            case 0xB4: result = as <= bs; break;
+            case 0xB5: result = as != bs; break;
+            }
+        } else {
+            double av = getNumeric(a);
+            double bv = getNumeric(b);
+            switch (opcode) {
+            case 0xB0: result = av == bv; break;
+            case 0xB1: result = av > bv; break;
+            case 0xB2: result = av < bv; break;
+            case 0xB3: result = av >= bv; break;
+            case 0xB4: result = av <= bv; break;
+            case 0xB5: result = av != bv; break;
+            }
         }
 
         if (!result) {
@@ -373,16 +386,29 @@ int execute(
         uint32_t falseIndex = readU32(progData->bytecode, pc);
 
         bool result = false;
-        double av = getNumeric(a);
-        double bv = getNumeric(b);
 
-        switch (opcode) {
-        case 0xC0: result = av == bv; break;
-        case 0xC1: result = av > bv; break;
-        case 0xC2: result = av < bv; break;
-        case 0xC3: result = av >= bv; break;
-        case 0xC4: result = av <= bv; break;
-        case 0xC5: result = av != bv; break;
+        if (a.type == TAG_STRING && b.type == TAG_STRING) {
+            std::string as = std::get<std::string>(a.data);
+            std::string bs = std::get<std::string>(b.data);
+            switch (opcode) {
+            case 0xC0: result = as == bs; break;
+            case 0xC1: result = as > bs; break;
+            case 0xC2: result = as < bs; break;
+            case 0xC3: result = as >= bs; break;
+            case 0xC4: result = as <= bs; break;
+            case 0xC5: result = as != bs; break;
+            }
+        } else {
+            double av = getNumeric(a);
+            double bv = getNumeric(b);
+            switch (opcode) {
+            case 0xC0: result = av == bv; break;
+            case 0xC1: result = av > bv; break;
+            case 0xC2: result = av < bv; break;
+            case 0xC3: result = av >= bv; break;
+            case 0xC4: result = av <= bv; break;
+            case 0xC5: result = av != bv; break;
+            }
         }
 
         if (!result) {
@@ -397,10 +423,12 @@ int execute(
         for (int i = 0; i < strCount; i++) {
             Variant strVar = execData->stack.back(); execData->stack.pop_back();
             std::string str;
-            if (auto* p = std::get_if<std::string>(&strVar.data)) {
-                str = *p;
-            } else {
-                str = ""; // or whatever default makes sense
+            if (strVar.type == TAG_STRING) {
+                str = std::get<std::string>(strVar.data);
+            } else if (strVar.type == TAG_INT) {
+                str = std::to_string(std::get<int64_t>(strVar.data));
+            } else if (strVar.type == TAG_FLOAT) {
+                str = std::to_string(std::get<double>(strVar.data));
             }
             result = str + result;
         }

@@ -1,11 +1,75 @@
 #include "compiler_internal.h"
+#include <cctype>
 
 int compileLine(const std::string& currentLine, CompileState& state, CompilerData* compilerData,
     bool verbose, bool debugInfo
 ) {
     std::string line = currentLine;
-    if (verbose) std::cout << line << std::endl;
-    auto tokens = tokenizeFormula(line);
+    
+    // Pre-process strings to protect them from destructive tokenization
+    std::vector<std::string> stringLiterals;
+    std::string modifiedLine;
+    bool inStr = false;
+    char quoteChar = 0;
+    std::string currentStr;
+    
+    for (size_t i = 0; i < line.size(); i++) {
+        char c = line[i];
+        if (!inStr) {
+            if (c == '"' || c == '\'') {
+                inStr = true;
+                quoteChar = c;
+                currentStr = c;
+            } else {
+                modifiedLine += c;
+            }
+        } else {
+            currentStr += c;
+            if (c == quoteChar) {
+                int backslashes = 0;
+                for (int j = static_cast<int>(i) - 1; j >= 0 && line[j] == '\\'; j--) {
+                    backslashes++;
+                }
+                if (backslashes % 2 == 0) { 
+                    inStr = false;
+                    std::string placeholder = "STRLIT" + std::to_string(stringLiterals.size());
+                    stringLiterals.push_back(currentStr);
+                    modifiedLine += placeholder;
+                }
+            }
+        }
+    }
+    if (inStr) {
+        std::string placeholder = "STRLIT" + std::to_string(stringLiterals.size());
+        stringLiterals.push_back(currentStr);
+        modifiedLine += placeholder;
+    }
+
+    if (verbose) std::cout << "Prescanned: " << modifiedLine << std::endl;
+    auto rawTokens = tokenizeFormula(modifiedLine);
+    
+    // Swap placeholders back for exact intact string literals
+    std::vector<std::string> tokens;
+    for (const auto& t : rawTokens) {
+        if (t.starts_with("STRLIT") && t.size() > 6) {
+            bool allDigits = true;
+            for(size_t k = 6; k < t.size(); k++) {
+                if(!std::isdigit(static_cast<unsigned char>(t[k]))) {
+                    allDigits = false;
+                    break;
+                }
+            }
+            if(allDigits) {
+                int idx = std::stoi(t.substr(6));
+                if (idx >= 0 && idx < stringLiterals.size()) {
+                    tokens.push_back(stringLiterals[idx]);
+                    continue;
+                }
+            }
+        }
+        tokens.push_back(t);
+    }
+
     if (verbose) {
         for (const auto& token : tokens) {
             std::cout << "[" << token << "] " << token.size() << " ";
@@ -32,7 +96,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
             std::vector<std::string> strs;
             
             for (size_t i = 2; i < tokens.size(); i++) {
-                formula += tokens[i];
+                formula += tokens[i] + " ";
             }
 
             try {
@@ -299,7 +363,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
             // assemble expression
             std::string statement;
             for(int i = 1; i < tokens.size(); i++) {
-                statement += tokens[i];
+                statement += tokens[i] + " ";
             }
             // compile expression
             try {
@@ -325,13 +389,14 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
 
             // check depth
             if(state.importDepth > 4) {
-                printError("Reached import depth of 4", state.lineIndex, state.ownFilename.back());
+                printError("Reached maximum import depth of 5", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
 
             // get file name to import
             std::string file = tokens[1];
             replaceAll(file, "'", "");
+            replaceAll(file, "\"", "");
 
             // check edge cases
             if(file == state.ownFilename.back()) {
@@ -364,10 +429,6 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
                     funcIndex = it->second.opcode;
                     state.funcArgs = 0;
                     state.requiredFuncArgs = it->second.argCount;
-                // } else if(tokens[1] != "=") {
-                //     printError("Unknown function: " + token, lineIndex);
-                //     return -1;
-                // }
                 } else {
                     op = ROUTINE_CALL;
 
@@ -402,12 +463,11 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         [[fallthrough]];
         case FUNC_CALL:
         case ROUTINE_CALL:
-        //case PUSH_STACK:
         {
             if(token == "(") {
                 if(argsOpen) {
                     callParenDepth++;
-                    state.functionArgument += token;
+                    state.functionArgument += token + " ";
                     break;
                 }
                 state.functionArgument.clear();
@@ -422,7 +482,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
                 }
                 if(callParenDepth > 0) {
                     callParenDepth--;
-                    state.functionArgument += token;
+                    state.functionArgument += token + " ";
                     break;
                 }
                 argsOpen = false;
@@ -430,7 +490,6 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
             } else if (token == ",") {
                 if(argsOpen && callParenDepth == 0) {
                     if(op == SUBROUTINE) {
-                        // TODO: add checks for expressions to prevent those
                         state.subroutineInfoMap[state.routineIndex].args.push_back(state.functionArgument);
                     } else {
                         try {
@@ -452,7 +511,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
                 }
             }
             if(argsOpen) {
-                state.functionArgument += token;
+                state.functionArgument += token + " ";
             }
         }
         break;
@@ -544,7 +603,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
                     printError("Syntax error", state.lineIndex, state.ownFilename.back());
                     return -1;
                 }
-                state.conditionTokens += token;
+                state.conditionTokens += token + " ";
             }
         }
         break;
@@ -559,7 +618,6 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
     case SUBROUTINE:
         if(!state.functionArgument.empty()) {
             if(op == SUBROUTINE) {
-                // TODO: add checks for expressions to prevent those
                 state.subroutineInfoMap[state.routineIndex].args.push_back(state.functionArgument);
             } else {
                 try {

@@ -44,14 +44,12 @@ std::unordered_map<int, NativeFn> funcMap = {
         stack.push_back({TAG_INT, result});
     }},
     {0x04, [](VMExecutionData* execData) {
-        // readString — was: pop varIndex, cin >> input, push (already stack-based)
         auto& stack = execData->stack;
         std::string input;
         std::cin >> input;
         stack.push_back({TAG_STRING, input});
     }},
     {0x05, [](VMExecutionData* execData) {
-        // str2int
         auto& stack = execData->stack;
         auto value = stack.back(); stack.pop_back();
 
@@ -64,7 +62,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         stack.push_back({TAG_INT, static_cast<int64_t>(num)});
     }},
     {0x06, [](VMExecutionData* execData) {
-        // int2str
         auto& stack = execData->stack;
         auto value = stack.back(); stack.pop_back();
 
@@ -75,7 +72,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         stack.push_back({TAG_STRING, str});
     }},
     {0x07, [](VMExecutionData* execData) {
-        // str2float
         auto& stack = execData->stack;
         auto value = stack.back(); stack.pop_back();
 
@@ -94,7 +90,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         stack.push_back({TAG_FLOAT, num});
     }},
     {0x08, [](VMExecutionData* execData) {
-        // float2str
         auto& stack = execData->stack;
         auto value = stack.back(); stack.pop_back();
 
@@ -105,9 +100,7 @@ std::unordered_map<int, NativeFn> funcMap = {
         std::string str = std::to_string(num);
         stack.push_back({TAG_STRING, str});
     }},
-    // stdlib impl
     {0xA0, [](VMExecutionData* execData) {
-        // assertCapability — no return value, unchanged
         auto& stack = execData->stack;
         auto value = stack.back(); stack.pop_back();
         if(value.type != TAG_STRING) {
@@ -122,7 +115,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         }
     }},
     {0xA1, [](VMExecutionData* execData) {
-        // openFile(filename) -> handle
         auto& stack = execData->stack;
         auto value = stack.back(); stack.pop_back();
 
@@ -138,7 +130,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         stack.push_back({TAG_INT, static_cast<int64_t>(fileHandleId++)});
     }},
     {0xA2, [](VMExecutionData* execData) {
-        // writeFile — no return value, unchanged
         auto& stack = execData->stack;
         auto handle = getInt(stack.back()); stack.pop_back();
 
@@ -155,7 +146,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         }
     }},
     {0xA3, [](VMExecutionData* execData) {
-        // readFile(handle) -> contents
         auto& stack = execData->stack;
         auto handle = getInt(stack.back()); stack.pop_back();
 
@@ -170,7 +160,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         }
     }},
     {0xA4, [](VMExecutionData* execData) {
-        // closeFile — no return value, unchanged
         auto& stack = execData->stack;
         auto handle = getInt(stack.back()); stack.pop_back();
 
@@ -184,14 +173,12 @@ std::unordered_map<int, NativeFn> funcMap = {
         }
     }},
     {0xA5, [](VMExecutionData* execData) {
-        // randomSeed — no return value, unchanged
         auto& stack = execData->stack;
         auto seed = getInt(stack.back()); stack.pop_back();
 
         rngEngine.seed(seed);
     }},
     {0xA6, [](VMExecutionData* execData) {
-        // random() -> float
         auto& stack = execData->stack;
 
         static std::uniform_real_distribution<double> dist(0.0, 1.0);
@@ -200,18 +187,16 @@ std::unordered_map<int, NativeFn> funcMap = {
         stack.push_back({TAG_FLOAT, val});
     }},
     {0xA7, [](VMExecutionData* execData) {
-        // randomRange(min, max) -> int
         auto& stack = execData->stack;
         auto max = getInt(stack.back()); stack.pop_back();
         auto min = getInt(stack.back()); stack.pop_back();
 
-        std::uniform_int_distribution<int64_t> dist(min, max); // inclusive on both ends
+        std::uniform_int_distribution<int64_t> dist(min, max); 
         int64_t val = dist(rngEngine);
 
         stack.push_back({TAG_INT, val});
     }},
     {0xA8, [](VMExecutionData* execData) {
-        // httpRequest(method, url, headerStr, body, &bodyOutVarIndex) -> status
         auto& stack = execData->stack;
         auto bodyOutVarIndex = getInt(stack.back()); stack.pop_back();
         auto body = std::get<std::string>(stack.back().data); stack.pop_back();
@@ -235,13 +220,23 @@ std::unordered_map<int, NativeFn> funcMap = {
         httplib::Headers headers = parseHeaders(headerStr);
         std::string m = toUpper(method);
 
+        std::string contentType = "application/octet-stream";
+        for (auto it = headers.begin(); it != headers.end(); ) {
+            if (toUpper(it->first) == "CONTENT-TYPE") {
+                contentType = it->second;
+                it = headers.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
         httplib::Result res;
         if (m == "GET") {
             res = cli.Get(path, headers);
         } else if (m == "POST") {
-            res = cli.Post(path, headers, body, "application/octet-stream");
+            res = cli.Post(path, headers, body, contentType);
         } else if (m == "PUT") {
-            res = cli.Put(path, headers, body, "application/octet-stream");
+            res = cli.Put(path, headers, body, contentType);
         } else if (m == "DELETE") {
             res = cli.Delete(path, headers);
         } else {
@@ -260,7 +255,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         stack.push_back({TAG_INT, static_cast<int64_t>(outStatus)});
     }},
     {0xA9, [](VMExecutionData* execData) {
-        // strlen(s) -> int
         auto& stack = execData->stack;
         auto value = stack.back(); stack.pop_back();
 
@@ -269,7 +263,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         stack.push_back({TAG_INT, static_cast<int64_t>(str.size())});
     }},
     {0xAA, [](VMExecutionData* execData) {
-        // substr(s, start, len) -> string
         auto& stack = execData->stack;
         auto lenArg = getInt(stack.back()); stack.pop_back();
         auto startArg = getInt(stack.back()); stack.pop_back();
@@ -285,7 +278,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         stack.push_back({TAG_STRING, result});
     }},
     {0xAB, [](VMExecutionData* execData) {
-        // strfind(s, needle) -> int index (-1 if not found)
         auto& stack = execData->stack;
         auto needleVal = stack.back(); stack.pop_back();
         auto strVal = stack.back(); stack.pop_back();
@@ -299,7 +291,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         stack.push_back({TAG_INT, result});
     }},
     {0xAC, [](VMExecutionData* execData) {
-        // toUpper/toLower(s, upperFlag) -> string
         auto& stack = execData->stack;
         auto upperFlag = getInt(stack.back()); stack.pop_back();
         auto value = stack.back(); stack.pop_back();
@@ -315,7 +306,6 @@ std::unordered_map<int, NativeFn> funcMap = {
         stack.push_back({TAG_STRING, str});
     }},
     {0xAD, [](VMExecutionData* execData) {
-        // trim(s) -> string
         auto& stack = execData->stack;
         auto value = stack.back(); stack.pop_back();
 

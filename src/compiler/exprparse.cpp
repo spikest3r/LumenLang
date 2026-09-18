@@ -12,14 +12,14 @@ static bool isNum(const std::string &s) {
 }
 
 static bool isOp(const std::string &s) {
-    if (s == "+" || s == "-" || s == "*" || s == "/" || s == "^" || s == "%" || s == "..")
+    if (s == "+" || s == "-" || s == "*" || s == "/" || s == "^" || s == "%" || s == ".." || s == "~")
         return true;
     return false;
 }
 
 static bool isOp(char c) {
     return c == '+' || c == '-' || c == '*' || c == '/' || c == '^' || c == '%';
-    // '..' can't be represented as a single char, so its excluded here
+    // '..' and '~' can't be represented as a single char here
 }
 
 static int getPrec(const std::string &op) {
@@ -27,11 +27,12 @@ static int getPrec(const std::string &op) {
     if (op == "+" || op == "-") return 2;
     if (op == "*" || op == "/" || op == "%") return 3;
     if (op == "^") return 4;
+    if (op == "~") return 5;
     return 0;
 }
 
 static bool isRightAssoc(const std::string &op) {
-    return op == "^";
+    return op == "^" || op == "~";
 }
 
 static std::vector<std::string> tokenize(const std::string &expr) {
@@ -59,9 +60,17 @@ static std::vector<std::string> tokenize(const std::string &expr) {
             continue;
         }
 
-        // unary minus: at start, after another operator, or after '('
-        if (ch == '-' && (i == 0 || isOp(expr[i - 1]) || expr[i - 1] == '(')) {
+        if ((ch == '+' || ch == '-') && !buf.empty() &&
+            (buf.back() == 'e' || buf.back() == 'E') &&
+            isNum(buf + "0")) { // buf+"0" e.g. "3e0" parses as a number => buf is a numeric prefix
             buf += ch;
+            continue;
+        }
+
+        // unary minus: at start, after another operator, or after '(' or ','
+        bool isUnary = tokens.empty() || isOp(tokens.back()) || tokens.back() == "(" || tokens.back() == ",";
+        if (ch == '-' && buf.empty() && isUnary) {
+            tokens.push_back("~");
             continue;
         }
 
@@ -70,13 +79,6 @@ static std::vector<std::string> tokenize(const std::string &expr) {
             i + 1 < expr.size() &&
             (std::isalpha(static_cast<unsigned char>(expr[i + 1])) ||
             expr[i + 1] == '_' || expr[i + 1] == '&')) {
-            buf += ch;
-            continue;
-        }
-
-        if ((ch == '+' || ch == '-') && !buf.empty() &&
-            (buf.back() == 'e' || buf.back() == 'E') &&
-            isNum(buf + "0")) { // buf+"0" e.g. "3e0" parses as a number => buf is a numeric prefix
             buf += ch;
             continue;
         }
@@ -232,11 +234,6 @@ static std::vector<std::string> shuntingYard(const std::vector<std::string> &tok
                                           "' cannot be applied to string literal " + out.back());
             }
             
-            // type check
-            if (op == ".." && !out.empty() && isNum(out.back())) {
-                throw std::runtime_error("type error: '..' cannot be applied to numeric literal " + out.back());
-            }
-            
             while (!ops.empty() && ops.back() != "(" &&
                 (getPrec(ops.back()) > getPrec(op) ||
                     (getPrec(ops.back()) == getPrec(op) && !isRightAssoc(op)))) {
@@ -339,6 +336,19 @@ static void evalRPN(const std::vector<std::string> &rpn, CompilerData* data, std
             }
 
             stack.push_back(t);
+        } else if (t == "~") {
+            if (stack.size() < 1) { return; }
+            std::string a = stack.back(); stack.pop_back();
+            if (isStringLit(a)) throw std::runtime_error("type error: unary minus cannot be applied to a string literal");
+
+            int constIndex = resolveConst(-1.0, TAG_INT, data);
+            bytecode.push_back(0x03);
+            bytecode.push_back(0x02); // TAG_INT
+            bytecode.push_back(constIndex);
+            
+            bytecode.push_back(0xA2); // MUL
+            
+            stack.push_back(t);
         } else {
             if (stack.size() < 2) { return; }
             std::string b = stack.back(); stack.pop_back();
@@ -348,11 +358,6 @@ static void evalRPN(const std::vector<std::string> &rpn, CompilerData* data, std
             bool bIsStr = isStringLit(b);
 
             if (t == "..") {
-                // concat: literal operands must not be numeric
-                if ((isNum(a) && !aIsStr) || (isNum(b) && !bIsStr)) {
-                    throw std::runtime_error("type error: '..' cannot be applied to a numeric literal");
-                }
-
                 // push count
                 bytecode.push_back(0x03);
                 bytecode.push_back(0x04);
