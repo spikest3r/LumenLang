@@ -67,8 +67,8 @@ static std::vector<std::string> tokenize(const std::string &expr) {
             continue;
         }
 
-        // unary minus: at start, after another operator, or after '(' or ','
-        bool isUnary = tokens.empty() || isOp(tokens.back()) || tokens.back() == "(" || tokens.back() == ",";
+        // unary minus: at start, after another operator, or after '(', ',', or '['
+        bool isUnary = tokens.empty() || isOp(tokens.back()) || tokens.back() == "(" || tokens.back() == "," || tokens.back() == "[";
         if (ch == '-' && buf.empty() && isUnary) {
             tokens.push_back("~");
             continue;
@@ -91,7 +91,7 @@ static std::vector<std::string> tokenize(const std::string &expr) {
                 tokens.push_back(buf);
                 buf.clear();
             }
-            if (isOp(ch) || ch == '(' || ch == ')' || ch == ',')
+            if (isOp(ch) || ch == '(' || ch == ')' || ch == ',' || ch == '[' || ch == ']')
                 tokens.push_back(std::string(1, ch));
         }
     }
@@ -115,12 +115,24 @@ static bool isCallToken(const std::string &t) {
     return t.size() > 6 && t.compare(0, 6, "@call:") == 0;
 }
 
-// Splits "@call:name:argCount" back into its parts. Assumes isCallToken(t).
 static void parseCallToken(const std::string &t, std::string &name, int &argCount) {
     size_t nameStart = 6; // strlen("@call:")
     size_t lastColon = t.rfind(':');
     name = t.substr(nameStart, lastColon - nameStart);
     argCount = std::stoi(t.substr(lastColon + 1));
+}
+
+// Array token helpers
+static std::string makeArrayToken(const std::string &name) {
+    return "@array:" + name;
+}
+
+static bool isArrayToken(const std::string &t) {
+    return t.size() > 7 && t.compare(0, 7, "@array:") == 0;
+}
+
+static std::string parseArrayToken(const std::string &t) {
+    return t.substr(7); // Extract the array name
 }
 
 // Tracks state for one open call's argument list so nested calls
@@ -146,9 +158,10 @@ static int requiredArgCount(const std::string &name, CompilerData* data) {
 
 static std::vector<std::string> shuntingYard(const std::vector<std::string> &tokens, CompilerData* data) {
     std::vector<std::string> out;
-    std::vector<std::string> ops;      // operators AND "(" markers
+    std::vector<std::string> ops;         // operators AND "(" AND "[" markers
     std::vector<CallArgFrame> callStack;  // parallel to any "(" that opens a call
-    std::vector<bool> parenIsCall;     // parallel to ops: was this "(" a call-open?
+    std::vector<bool> parenIsCall;        // parallel to ops: was this "(" a call-open?
+    std::vector<std::string> arrayStack;  // parallel to any "[" that opens an array access
 
     for (size_t i = 0; i < tokens.size(); i++) {
         const std::string &t = tokens[i];
@@ -162,7 +175,7 @@ static std::vector<std::string> shuntingYard(const std::vector<std::string> &tok
             if (i > 0) {
                 const std::string &prev = tokens[i - 1];
                 if (!isNum(prev) && !isStringLit(prev) && !isOp(prev) &&
-                    prev != "(" && prev != ")" && prev != "," &&
+                    prev != "(" && prev != ")" && prev != "," && prev != "[" && prev != "]" &&
                     !prev.empty() &&
                     (std::isalpha(static_cast<unsigned char>(prev[0])) || prev[0] == '_')) {
                     isCallOpen = true;
@@ -182,15 +195,32 @@ static std::vector<std::string> shuntingYard(const std::vector<std::string> &tok
                 parenIsCall.push_back(false);
             }
             ops.push_back(t);
+        } else if (t == "[") {
+            // A "[" immediately after an identifier opens an array access
+            if (i == 0) throw std::runtime_error("expected array name before '['");
+            const std::string &prev = tokens[i - 1];
+            if (isNum(prev) || isStringLit(prev) || isOp(prev) ||
+                prev == "(" || prev == ")" || prev == "," || prev == "[" || prev == "]" ||
+                prev.empty() ||
+                !(std::isalpha(static_cast<unsigned char>(prev[0])) || prev[0] == '_')) {
+                throw std::runtime_error("expected array name before '['");
+            }
+
+            const std::string &name = prev;
+            // Pop the array name from the output queue, similar to function names
+            if (!out.empty() && out.back() == name) out.pop_back();
+
+            arrayStack.push_back(name);
+            ops.push_back(t);
         } else if (t == ",") {
             if (callStack.empty()) {
                 throw std::runtime_error("',' outside of a function call");
             }
-            while (!ops.empty() && ops.back() != "(") {
+            while (!ops.empty() && ops.back() != "(" && ops.back() != "[") {
                 out.push_back(ops.back());
                 ops.pop_back();
             }
-            if (ops.empty()) {
+            if (ops.empty() || ops.back() != "(") {
                 throw std::runtime_error("mismatched ',' in expression");
             }
             callStack.back().argCount++;
@@ -224,6 +254,23 @@ static std::vector<std::string> shuntingYard(const std::vector<std::string> &tok
 
                 out.push_back(makeCallToken(name, finalArgCount));
             }
+        } else if (t == "]") {
+            while (!ops.empty() && ops.back() != "[") {
+                out.push_back(ops.back());
+                ops.pop_back();
+            }
+            if (ops.empty()) {
+                throw std::runtime_error("mismatched ']' in expression");
+            }
+            ops.pop_back(); // discard '['
+
+            if (arrayStack.empty()) {
+                throw std::runtime_error("internal error: missing array name");
+            }
+
+            std::string name = arrayStack.back();
+            arrayStack.pop_back();
+            out.push_back(makeArrayToken(name)); // Emit token to evaluate index then read
         } else {
             const std::string &op = t;
 
@@ -234,7 +281,7 @@ static std::vector<std::string> shuntingYard(const std::vector<std::string> &tok
                                           "' cannot be applied to string literal " + out.back());
             }
             
-            while (!ops.empty() && ops.back() != "(" &&
+            while (!ops.empty() && ops.back() != "(" && ops.back() != "[" &&
                 (getPrec(ops.back()) > getPrec(op) ||
                     (getPrec(ops.back()) == getPrec(op) && !isRightAssoc(op)))) {
                 out.push_back(ops.back());
@@ -247,6 +294,9 @@ static std::vector<std::string> shuntingYard(const std::vector<std::string> &tok
     while (!ops.empty()) {
         if (ops.back() == "(") {
             throw std::runtime_error("mismatched '(' in expression");
+        }
+        if (ops.back() == "[") {
+            throw std::runtime_error("mismatched '[' in expression");
         }
         out.push_back(ops.back());
         ops.pop_back();
@@ -302,6 +352,20 @@ static void evalRPN(const std::vector<std::string> &rpn, CompilerData* data, std
             }
 
             stack.push_back(t); // placeholder for the call's return value
+        } else if (isArrayToken(t)) {
+            std::string name = parseArrayToken(t);
+
+            if (stack.empty()) {
+                throw std::runtime_error("internal error: missing index operand for array access");
+            }
+            stack.pop_back(); // Remove index placeholder
+
+            int arrayIdx = resolveArrayIndex(name, data);
+
+            bytecode.push_back(0xDB); // ARRREAD
+            bytecode.push_back(static_cast<uint8_t>(arrayIdx));
+
+            stack.push_back(t); // Placeholder for the fetched array value
         } else if (isStringLit(t)) {
             std::string value = t.substr(1, t.size() - 2); // strip quotes
             int constIndex = resolveString(value, data);

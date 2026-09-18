@@ -95,6 +95,18 @@ int resolveVariableIndex(std::string keyword, CompilerData* data) {
     }
 }
 
+int resolveArrayIndex(std::string keyword, CompilerData* data) {
+    auto it = data->arrayMap.find(keyword);
+
+    if (it != data->arrayMap.end()) {
+        return it->second;
+    } else {
+        int idx = (int)data->arrayMap.size();
+        data->arrayMap[keyword] = idx;
+        return idx;
+    }
+}
+
 int resolveString(std::string str, CompilerData* data) {
     replaceAll(str, "'", "");
 
@@ -142,6 +154,8 @@ int getOpCodeOffset(int opcode) {
     case 0xA8: // INCV
     case 0xA9: // DECV
     case 0xAB: // CPY
+    case 0xDA: // ARRWRITE
+    case 0xDB: // ARRREAD
         return 2;
 
     case 0xAA: // JOIN
@@ -249,6 +263,8 @@ std::unordered_map<int, std::string> disassemblyMap = {
     {0xAA, "JOIN"},
     {0xAB, "CPY"},
     {0xDE, "DEREF"},
+    {0xDA, "ARRWRITE"},
+    {0xDB, "ARRREAD"},
     {0xFE, "RET"},
     {0xFF, "HLT"}
 };

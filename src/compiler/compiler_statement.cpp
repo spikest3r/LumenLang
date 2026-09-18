@@ -90,12 +90,25 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
     int callParenDepth = 0;
     std::string routineToCall = "";
 
+    // prescan for assign operation
+    bool assign = false;
+    for(const auto& t: tokens) {
+        if(t == "=") {
+            assign = true;
+            break;
+        }
+    }
+
+    int tokenIdx = 0;
     for (const auto& token : tokens) {
         if (token == "=") {
+            tokenIdx++;
+
             std::string formula;
             std::vector<std::string> strs;
             
-            for (size_t i = 2; i < tokens.size(); i++) {
+            // read everything past equals sign
+            for (size_t i = tokenIdx; i < tokens.size(); i++) {
                 formula += tokens[i] + " ";
             }
 
@@ -107,13 +120,52 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
                 printError(e.what(), state.lineIndex, state.ownFilename.back());
                 return -1;
             }
+
+            // read everything before equals sign
+            std::vector<std::string> destination;
+            for(size_t i = 0; i < tokenIdx - 1; i++) {
+                destination.push_back(tokens[i]);
+            }
             
-            bytecode.push_back(0x02);
-            keyword = tokens[0];
-            auto var_index = resolveVariableIndex(keyword, compilerData);
-            varIndex_assign = var_index;
-            bytecode.push_back(var_index);
+            if(destination.size() == 1) {
+                // most likely regular expression
+                bytecode.push_back(0x02); // POP
+
+                // into variable
+                auto var_index = resolveVariableIndex(destination.back(), compilerData);
+                varIndex_assign = var_index;
+                bytecode.push_back(var_index);
+            } else {
+                // most likely array
+                const std::string& arrayName = destination[0];
+                // destination[1] is '['
+                // destination[last] is ']'
+                formula.clear();
+                for(int i = 2; i < destination.size() - 1; i++) {
+                    formula += destination[i];
+                }
+
+                // compile array idx in stack
+                try {
+                    compileExpression(
+                        formula, compilerData, bytecode
+                    ); // result in stack
+                } catch (const std::exception& e) {
+                    printError(e.what(), state.lineIndex, state.ownFilename.back());
+                    return -1;
+                }
+
+                // assign operation, emit arrwrite bytecode
+                // value in stack
+                // idx in stack
+                bytecode.push_back(0xDA); // ARRWRITE idx
+
+                auto arrayIdx = resolveArrayIndex(arrayName, compilerData);
+                bytecode.push_back(arrayIdx); // index
+            }
+
             op = NONE;
+            
             break;
         }
         else if (token == "label") {
@@ -420,7 +472,8 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else {
             if (op == NONE) {
-                if (tokens.size() > 1 && tokens[1] == "=") {
+                if (assign) {
+                    tokenIdx++;
                     continue;
                 }
                 auto it = funcList.find(token);
@@ -610,6 +663,8 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         default:
             break;
         }
+
+        tokenIdx++;
     }
 
     switch (op) {

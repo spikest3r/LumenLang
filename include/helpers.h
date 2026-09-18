@@ -34,6 +34,7 @@ struct CompilerData {
     int variableCount = 0;
 
     std::unordered_map<std::string, int> variableMap;
+    std::unordered_map<std::string, int> arrayMap;
     std::unordered_map<std::string, int> stringPoolMap;
     std::unordered_map<std::pair<int, double>, int, ConstPoolKeyHash> constPoolMap;
 
@@ -49,6 +50,7 @@ httplib::Headers parseHeaders(const std::string& headerStr);
 void replaceAll(std::string& str, const std::string& from, const std::string& to);
 bool isPureNumber(const std::string& s);
 int resolveVariableIndex(std::string keyword, CompilerData* data);
+int resolveArrayIndex(std::string keyword, CompilerData* data);
 int resolveString(std::string str, CompilerData* data);
 int resolveConst(double constValue, TypeTag type, CompilerData* data);
 int getOpCodeOffset(int opcode);
