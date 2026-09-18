@@ -44,8 +44,9 @@ void prescanRoutines(const std::vector<std::string>& lines, CompilerData* compil
     }
 }
 
-void printError(std::string error, int line) {
-    std::cerr << "Error on line " << line << std::endl << "    >>> " << error << std::endl;
+void printError(std::string error, int line, std::string file) {
+    std::cerr << "In file " << file << std::endl;
+    std::cerr << "  - Error on line " << line << std::endl << "    >>> " << error << std::endl;
 }
 
 void pushToStack(std::string token, CompilerData* data, std::vector<uint8_t>& bytecode) {

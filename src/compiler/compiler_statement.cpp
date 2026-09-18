@@ -40,7 +40,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
                     formula, compilerData, bytecode
                 ); // result in stack
             } catch (const std::exception& e) {
-                printError(e.what(), state.lineIndex);
+                printError(e.what(), state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             
@@ -54,7 +54,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "label") {
             if (op != NONE) {
-                printError("Syntax error", state.lineIndex);
+                printError("Syntax error", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             op = LABEL;
@@ -62,7 +62,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "jump") {
             if (op != NONE) {
-                printError("Syntax error", state.lineIndex);
+                printError("Syntax error", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             op = JUMP;
@@ -70,7 +70,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "if") {
             if (op != NONE) {
-                printError("Syntax error", state.lineIndex);
+                printError("Syntax error", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             op = IF;
@@ -82,7 +82,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "endif") {
             if (state.blockDepth.size() == 0 || state.blockDepth.back() != BlockType::IF) {
-                printError("Unexpected 'endif' (no matching 'if')", state.lineIndex);
+                printError("Unexpected 'endif' (no matching 'if')", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             bool isElseDefined = state.elseDefined.back();
@@ -109,7 +109,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "else") {
             if (state.blockDepth.size() == 0 || state.blockDepth.back() != BlockType::IF) {
-                printError("Unexpected 'else' (no matching 'if')", state.lineIndex);
+                printError("Unexpected 'else' (no matching 'if')", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             state.elseDefined.back() = true;
@@ -125,7 +125,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         } else if(token == "elif") {
             // else
             if (state.blockDepth.size() == 0 || state.blockDepth.back() != BlockType::IF) {
-                printError("Unexpected 'elif' (no matching 'if')", state.lineIndex);
+                printError("Unexpected 'elif' (no matching 'if')", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             state.elseDefined.back() = true;
@@ -147,7 +147,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "while") {
             if (op != NONE) {
-                printError("Syntax error", state.lineIndex);
+                printError("Syntax error", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             op = WHILE;
@@ -158,7 +158,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "endwhile") {
             if (state.blockDepth.size() == 0 || state.blockDepth.back() != BlockType::WHILE) {
-                printError("Unexpected 'endwhile' (no matching 'while')", state.lineIndex);
+                printError("Unexpected 'endwhile' (no matching 'while')", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             state.loopDepth--;
@@ -174,7 +174,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "repeat") {
             if (op != NONE) {
-                printError("Syntax error", state.lineIndex);
+                printError("Syntax error", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             op = REPEAT;
@@ -184,7 +184,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "endrepeat") {
             if (state.blockDepth.size() == 0 || state.blockDepth.back() != BlockType::REPEAT) {
-                printError("Unexpected 'endrepeat' (no matching 'repeat')", state.lineIndex);
+                printError("Unexpected 'endrepeat' (no matching 'repeat')", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             state.loopDepth--;
@@ -201,7 +201,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "halt") {
             if (op != NONE) {
-                printError("Syntax error", state.lineIndex);
+                printError("Syntax error", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             bytecode.push_back(0xFF);
@@ -210,7 +210,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "continue") {
             if (state.loopDepth <= 0) {
-                printError("Unexpected 'continue' (outside loop body)", state.lineIndex);
+                printError("Unexpected 'continue' (outside loop body)", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
 
@@ -220,7 +220,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "break") {
             if (state.loopDepth <= 0) {
-                printError("Unexpected 'break' (outside loop body)", state.lineIndex);
+                printError("Unexpected 'break' (outside loop body)", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
 
@@ -231,12 +231,12 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "routine") {
             if (op != NONE) {
-                printError("Syntax error", state.lineIndex);
+                printError("Syntax error", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             op = SUBROUTINE;
             if (state.inRoutine) {
-                printError("Nested routines/functions are not allowed", state.lineIndex);
+                printError("Nested routines/functions are not allowed", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             state.inRoutine = true;
@@ -244,11 +244,11 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "endroutine") {
             if (op != NONE) {
-                printError("Syntax error", state.lineIndex);
+                printError("Syntax error", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             if (!state.inRoutine) {
-                printError("Unexpected 'endroutine' (no matching 'routine')", state.lineIndex);
+                printError("Unexpected 'endroutine' (no matching 'routine')", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             bytecode.push_back(0xFE); // RET
@@ -258,12 +258,12 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "function") {
             if (op != NONE) {
-                printError("Syntax error", state.lineIndex);
+                printError("Syntax error", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             op = SUBROUTINE;
             if (state.inFunction) {
-                printError("Nested routines/functions are not allowed", state.lineIndex);
+                printError("Nested routines/functions are not allowed", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             state.inFunction = true;
@@ -271,11 +271,11 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "endfunction") {
             if (op != NONE) {
-                printError("Syntax error", state.lineIndex);
+                printError("Syntax error", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             if (!state.inFunction) {
-                printError("Unexpected 'endfunction' (no matching 'function')", state.lineIndex);
+                printError("Unexpected 'endfunction' (no matching 'function')", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             bytecode.push_back(0xFE); // RET
@@ -285,15 +285,15 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         }
         else if (token == "return") {
             if (op != NONE) {
-                printError("Syntax error", state.lineIndex);
+                printError("Syntax error", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             if (!state.inFunction) {
-                printError("'return' is not allowed outside routine block", state.lineIndex);
+                printError("'return' is not allowed outside routine block", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             if(tokens.size() < 2) {
-                printError("Syntax error: expected statement after 'return'", state.lineIndex);
+                printError("Syntax error: expected statement after 'return'", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             // assemble expression
@@ -307,7 +307,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
                     statement, compilerData, bytecode
                 ); // result in stack
             } catch (const std::exception& e) {
-                printError(e.what(), state.lineIndex);
+                printError(e.what(), state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             // result remains in stack to be consumed
@@ -319,25 +319,34 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         {
             // check syntax first
             if(tokens.size() != 2 || op != NONE) {
-                printError("Syntax error", state.lineIndex);
+                printError("Syntax error", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
 
             // check depth
             if(state.importDepth > 4) {
-                printError("Reached import depth of 4", state.lineIndex);
+                printError("Reached import depth of 4", state.lineIndex, state.ownFilename.back());
+                return -1;
+            }
+
+            // get file name to import
+            std::string file = tokens[1];
+            replaceAll(file, "'", "");
+
+            // check edge cases
+            if(file == state.ownFilename.back()) {
+                printError("import error: self-import", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
 
             // recursively compile next script
             state.importDepth++;
-            std::string file = tokens[1];
-            replaceAll(file, "'", "");
             std::ifstream fileStream(file);
             int status = compileFromFile(fileStream, compilerData, verbose, debugInfo, file, &state);
             state.importDepth--;
+            state.ownFilename.pop_back();
             if(status != 0) {
-                printError("Script compilation has failed", state.lineIndex);
+                printError("Script compilation has failed", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
 
@@ -408,7 +417,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
             } else if (token == ")") {
                 if(!argsOpen) {
                     // error
-                    printError("Unexpected \')\'", state.lineIndex);
+                    printError("Unexpected \')\'", state.lineIndex, state.ownFilename.back());
                     return -1;
                 }
                 if(callParenDepth > 0) {
@@ -429,7 +438,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
                                 state.functionArgument, compilerData, bytecode
                             ); // result in stack
                         } catch (const std::exception& e) {
-                            printError(e.what(), state.lineIndex);
+                            printError(e.what(), state.lineIndex, state.ownFilename.back());
                             return -1;
                         }
 
@@ -497,7 +506,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         {
             if (token == ",") continue; // skip delimiter char
             if(conditionArgs > 2) {
-                printError("Too much arguments", state.lineIndex);
+                printError("Too much arguments", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             tokenStack.push_back(token);
@@ -510,7 +519,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
             auto it = condOpMap.find(keyword);
             if (it != condOpMap.end()) {
                 if (condOp != COP_NONE || state.conditionTokens.size() == 0) {
-                    printError("Syntax error", state.lineIndex);
+                    printError("Syntax error", state.lineIndex, state.ownFilename.back());
                     return -1;
                 } 
 
@@ -522,7 +531,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
                     state.conditionTokens.clear();
                 }
                 catch (const std::exception& e) {
-                    printError(e.what(), state.lineIndex);
+                    printError(e.what(), state.lineIndex, state.ownFilename.back());
                     return -1;
                 }
 
@@ -532,7 +541,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
             }
             else {
                 if (conditionArgs > 1 && condOp != COP_NONE) {
-                    printError("Syntax error", state.lineIndex);
+                    printError("Syntax error", state.lineIndex, state.ownFilename.back());
                     return -1;
                 }
                 state.conditionTokens += token;
@@ -558,7 +567,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
                         state.functionArgument, compilerData, bytecode
                     ); // result in stack
                 } catch (const std::exception& e) {
-                    printError(e.what(), state.lineIndex);
+                    printError(e.what(), state.lineIndex, state.ownFilename.back());
                     return -1;
                 }
 
@@ -583,7 +592,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
                 std::stringstream ss;
                 ss << "argument count mismatch for '" << key << "': expected " 
                     << state.requiredFuncArgs << ", got " << state.funcArgs << "\n";
-                printError(ss.str(), state.lineIndex);
+                printError(ss.str(), state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             if(op == FUNC_CALL) {
@@ -612,7 +621,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
     case IF:
     {
         if (state.conditionTokens.size() == 0) {
-            printError("Syntax error", state.lineIndex);
+            printError("Syntax error", state.lineIndex, state.ownFilename.back());
             return -1;
         }
 
@@ -624,7 +633,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
             state.conditionTokens.clear();
         }
         catch (const std::exception& e) {
-            printError(e.what(), state.lineIndex);
+            printError(e.what(), state.lineIndex, state.ownFilename.back());
             return -1;
         }
         conditionArgs++;
@@ -632,7 +641,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         auto it = condOpcodeMap.find(condOp);
         if (it != condOpcodeMap.end()) {
             if (conditionArgs != 2) {
-                printError("Syntax error", state.lineIndex);
+                printError("Syntax error", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             bytecode.push_back(it->second); // IF32 opcode
@@ -648,7 +657,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
             }
         }
         else {
-            printError("Syntax error", state.lineIndex);
+            printError("Syntax error", state.lineIndex, state.ownFilename.back());
             return -1;
         }
         break;

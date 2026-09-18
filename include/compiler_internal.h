@@ -62,6 +62,7 @@ struct CompileState {
     int loopDepth = 0;
 
     int importDepth = 0; // used to prevent recursive import lock-up
+    std::vector<std::string> ownFilename;
 };
 
 extern std::unordered_map<std::string, Function> funcList;
@@ -70,7 +71,7 @@ extern const std::unordered_map<ConditionOp, uint8_t> condOpcodeMap;
 
 void emitUint32(std::vector<uint8_t>& bytecode, uint32_t value);
 void patchUint32(std::vector<uint8_t>& bytecode, int location, uint32_t value);
-void printError(std::string error, int line);
+void printError(std::string error, int line, std::string file);
 void pushToStack(std::string token, CompilerData* data, std::vector<uint8_t>& bytecode);
 void prescanRoutines(const std::vector<std::string>& lines, CompilerData* compilerData);
 

@@ -17,7 +17,7 @@ int finalizeCompile(CompileState& state, CompilerData* compilerData,
                 patchUint32(compilerData->bytecode, it.location, static_cast<uint32_t>(it2->second));
             }
             else {
-                printError("Label '" + it.keyword + "' is not defined in global scope", it.line);
+                printError("Label '" + it.keyword + "' is not defined in global scope", it.line, state.ownFilename.back());
                 return -1;
             }
         }
@@ -44,7 +44,7 @@ int finalizeCompile(CompileState& state, CompilerData* compilerData,
                     patchUint32(state.subroutineBytecode[idx], jump.location, relativeTarget);
                 }
                 else {
-                    printError("Label '" + jump.keyword + "' is not defined in routine scope", jump.line);
+                    printError("Label '" + jump.keyword + "' is not defined in routine scope", jump.line, state.ownFilename.back());
                     return -1;
                 }
             }
@@ -75,7 +75,7 @@ int finalizeCompile(CompileState& state, CompilerData* compilerData,
             }
         }
         else {
-            printError("Subroutine '" + keyword + "' is not defined", line);
+            printError("Subroutine '" + keyword + "' is not defined", line, state.ownFilename.back());
             return -1;
         }
     }
@@ -96,7 +96,7 @@ int finalizeCompile(CompileState& state, CompilerData* compilerData,
             }
         }
         else {
-            printError("Routine '" + it.name + "' is not defined", -1);
+            printError("Routine '" + it.name + "' is not defined", -1, state.ownFilename.back());
             return -1;
         }
     }

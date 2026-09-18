@@ -17,6 +17,8 @@ int compileFromStream(std::istream& input,
     CompileState& state =
         prevState ? *prevState : localState.emplace();
 
+    state.ownFilename.push_back(fileName);
+
     bool subscript = prevState != nullptr;
 
     for (const std::string& currentLine : allLines) {
