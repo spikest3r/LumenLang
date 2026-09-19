@@ -4,7 +4,8 @@
 typedef enum {
     TAG_INT = 2,
     TAG_FLOAT = 3,
-    TAG_STRING = 1
+    TAG_STRING = 1,
+    TAG_ARRAY = 4
 } TypeTag;
 
 typedef struct {

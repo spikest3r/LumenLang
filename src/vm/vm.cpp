@@ -457,6 +457,23 @@ int execute(
         execData->stack.push_back(variable);
         break;
     }
+    case 0xDA: {
+        // ARRWRITE arrayIndex: stack [value, index(top)] -> []
+        // creates the array if it doesn't exist, grows it to fit index
+        auto arrayIndex = progData->bytecode[execData->PC + 1];
+        Variant idx = execData->stack.back(); execData->stack.pop_back();
+        Variant val = execData->stack.back(); execData->stack.pop_back();
+        execData->translator.arrayWrite(arrayIndex, getInt(idx), val);
+        break;
+    }
+    case 0xDB: {
+        // ARRREAD arrayIndex: stack [index(top)] -> [value]
+        // throws std::runtime_error if array or index doesn't exist
+        auto arrayIndex = progData->bytecode[execData->PC + 1];
+        Variant idx = execData->stack.back(); execData->stack.pop_back();
+        execData->stack.push_back(execData->translator.arrayRead(arrayIndex, getInt(idx)));
+        break;
+    }
     case 0xFF:
         execData->halt = true;
         break;

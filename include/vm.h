@@ -76,6 +76,10 @@ struct Slot {
     TypeTag tag; // for internal reference
 };
 
+// array block layout: [ArrayHeader][ArrayCell x capacity]
+struct ArrayHeader { uint32_t length; uint32_t capacity; };
+struct ArrayCell   { TypeTag tag; uint64_t payload; }; // int/float: raw bits; string: Handle
+
 class AddrTranslator {
 public:
     AddrTranslator(MemAllocator* allocator);
@@ -85,10 +89,19 @@ public:
     void allocateSlotSize(int index, size_t size, TypeTag tag);
     size_t count();
     void freeAll();
+
+    // arrays: own index space (matches the compiler's arrayMap), typeless + dynamic
+    // storage lives in MemAllocator: one block per array (header + fixed-size cells),
+    // string elements are separate handle-backed blocks
+    void arrayWrite(int arrayIndex, int64_t index, const Variant& v); // creates array, grows to fit
+    Variant arrayRead(int arrayIndex, int64_t index);                 // throws std::runtime_error
 private:
     MemAllocator* memory;
 
     std::unordered_map<int, Slot> slots;
+    std::unordered_map<int, Handle> arrays; // array index -> block handle
+
+    void freeCell(const ArrayCell& c);
 };
 
 // vm
