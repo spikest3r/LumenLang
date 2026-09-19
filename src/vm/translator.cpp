@@ -195,3 +195,48 @@ Variant AddrTranslator::arrayRead(int arrayIndex, int64_t index) {
     }
     return v;
 }
+
+// ---------------------------------------------------------------------
+// Garbage Collection
+// ---------------------------------------------------------------------
+
+void AddrTranslator::runGC() {
+    // 1. Mark root memory slots
+    for (const auto& [idx, slot] : slots) {
+        memory->mark(slot.h);
+    }
+
+    // 2. Mark root arrays and nested string handles
+    for (const auto& [idx, h] : arrays) {
+        memory->mark(h);
+        
+        auto* hdr = static_cast<ArrayHeader*>(memory->deref(h));
+        if (hdr) {
+            ArrayCell* cells = cellsOf(hdr);
+            for (uint32_t i = 0; i < hdr->length; i++) {
+                if (cells[i].tag == TAG_STRING && cells[i].payload != INVALID_HANDLE) {
+                    memory->mark(static_cast<Handle>(cells[i].payload));
+                }
+            }
+        }
+    }
+
+    // 3. Sweep unreferenced handles
+    memory->collect();
+
+    // 4. Compact active pages
+    memory->defragment();
+}
+
+void AddrTranslator::checkAndRunGC(size_t& threshold) {
+    if (memory->allocated_bytes() > threshold) {
+        runGC();
+        
+        // Dynamically adjust threshold: 2x current usage, floor at 1MB
+        size_t currentUsage = memory->allocated_bytes();
+        threshold = currentUsage * 2;
+        if (threshold < 1024 * 1024) {
+            threshold = 1024 * 1024;
+        }
+    }
+}

@@ -34,11 +34,20 @@ int run(
     execData.PC = 0;
     execData.routineBase = 0;
 
+    size_t gcThreshold = 1024 * 1024; // 1 MB initial threshold
+    uint32_t instructionCycle = 0;
+
     while(true) {
         auto opcode = progData->bytecode[execData.PC];
         int offset = getOpCodeOffset(opcode);
 
         int result = execute(progData, &execData);
+
+        // Schedule GC between instructions ensuring VM state is completely stable
+        instructionCycle++;
+        if (instructionCycle % 1000 == 0) {
+            execData.translator.checkAndRunGC(gcThreshold);
+        }
 
         if(execData.halt || result == -1)
             break;

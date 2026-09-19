@@ -95,6 +95,9 @@ public:
     // string elements are separate handle-backed blocks
     void arrayWrite(int arrayIndex, int64_t index, const Variant& v); // creates array, grows to fit
     Variant arrayRead(int arrayIndex, int64_t index);                 // throws std::runtime_error
+
+    void runGC();
+    void checkAndRunGC(size_t& threshold);
 private:
     MemAllocator* memory;
 
