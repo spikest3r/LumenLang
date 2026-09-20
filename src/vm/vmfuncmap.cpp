@@ -120,8 +120,9 @@ std::unordered_map<int, NativeFn> funcMap = {
 
         auto filename = std::get<std::string>(value.data);
 
-        auto stream = new std::fstream(filename, std::ios::in | std::ios::out | std::ios::trunc);
+        auto stream = new std::fstream(filename, std::ios::in | std::ios::out | std::ios::app);
         if(!stream->is_open()) {
+            delete stream;
             throw std::runtime_error("openFile failed: unable to open file " + filename);
         }
 
@@ -141,6 +142,7 @@ std::unordered_map<int, NativeFn> funcMap = {
         if(it != fileHandles.end()) {
             auto f = it->second;
             *f << valueToWrite;
+            f->flush();
         } else {
             throw std::runtime_error("writeFile failed: invalid file handle");
         }
@@ -152,7 +154,11 @@ std::unordered_map<int, NativeFn> funcMap = {
         auto it = fileHandles.find(handle);
         if(it != fileHandles.end()) {
             auto f = it->second;
+            f->flush();
+            f->clear();
+            f->seekg(0, std::ios::beg);
             std::string contents((std::istreambuf_iterator<char>(*f)), std::istreambuf_iterator<char>());
+            f->clear();
 
             stack.push_back({TAG_STRING, contents});
         } else {
@@ -167,9 +173,10 @@ std::unordered_map<int, NativeFn> funcMap = {
         if(it != fileHandles.end()) {
             auto f = it->second;
             f->close();
+            delete f;
             fileHandles.erase(it);
         } else {
-            throw std::runtime_error("writeFile failed: invalid file handle");
+            throw std::runtime_error("closeFile failed: invalid file handle");
         }
     }},
     {0xA5, [](VMExecutionData* execData) {

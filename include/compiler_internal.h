@@ -73,7 +73,7 @@ void emitUint32(std::vector<uint8_t>& bytecode, uint32_t value);
 void patchUint32(std::vector<uint8_t>& bytecode, int location, uint32_t value);
 void printError(std::string error, int line, std::string file);
 void pushToStack(std::string token, CompilerData* data, std::vector<uint8_t>& bytecode);
-void prescanRoutines(const std::vector<std::string>& lines, CompilerData* compilerData);
+bool prescanRoutines(const std::vector<std::string>& lines, CompilerData* compilerData, const std::string& fileName);
 
 // Compiles a single already-tokenized source line into bytecode, updating
 // CompileState in place. Returns -1 on error (after calling printError), 0 on success.

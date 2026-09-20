@@ -57,7 +57,13 @@ int run(
 }
 
 
-int execute(
+static void requireNumeric(const Variant& a, const Variant& b) {
+    if (a.type == TAG_STRING || b.type == TAG_STRING) {
+        throw std::runtime_error("type error: arithmetic on a string value");
+    }
+}
+
+static int executeInstruction(
     VMProgramData* progData,
     VMExecutionData* execData
 ) {
@@ -184,6 +190,7 @@ int execute(
         }
         Variant b = execData->stack.back(); execData->stack.pop_back();
         Variant a = execData->stack.back(); execData->stack.pop_back();
+        requireNumeric(a, b);
         Variant result;
         if (isFloatVariant(a, b)) {
             result.type = TAG_FLOAT;
@@ -203,6 +210,7 @@ int execute(
         }
         Variant b = execData->stack.back(); execData->stack.pop_back();
         Variant a = execData->stack.back(); execData->stack.pop_back();
+        requireNumeric(a, b);
         Variant result;
         if (isFloatVariant(a, b)) {
             result.type = TAG_FLOAT;
@@ -222,6 +230,7 @@ int execute(
         }
         Variant b = execData->stack.back(); execData->stack.pop_back();
         Variant a = execData->stack.back(); execData->stack.pop_back();
+        requireNumeric(a, b);
         Variant result;
         if (isFloatVariant(a, b)) {
             result.type = TAG_FLOAT;
@@ -241,6 +250,7 @@ int execute(
         }
         Variant b = execData->stack.back(); execData->stack.pop_back();
         Variant a = execData->stack.back(); execData->stack.pop_back();
+        requireNumeric(a, b);
         Variant result;
         result.type = TAG_FLOAT;
         result.data = getNumeric(a) / getNumeric(b);
@@ -254,6 +264,7 @@ int execute(
         }
         Variant b = execData->stack.back(); execData->stack.pop_back();
         Variant a = execData->stack.back(); execData->stack.pop_back();
+        requireNumeric(a, b);
         Variant result;
         if (isFloatVariant(a, b)) {
             result.type = TAG_FLOAT;
@@ -273,6 +284,7 @@ int execute(
         }
         Variant b = execData->stack.back(); execData->stack.pop_back();
         Variant a = execData->stack.back(); execData->stack.pop_back();
+        requireNumeric(a, b);
         Variant result;
         if (isFloatVariant(a, b)) {
             result.type = TAG_FLOAT;
@@ -280,6 +292,7 @@ int execute(
         }
         else {
             result.type = TAG_INT;
+            if (getInt(b) == 0) throw std::runtime_error("modulo by zero");
             result.data = getInt(a) % getInt(b);
         }
         execData->stack.push_back(result);
@@ -492,4 +505,18 @@ int execute(
     }
 
     return execData->PC + offset;
+}
+
+int execute(
+    VMProgramData* progData,
+    VMExecutionData* execData
+) {
+    try {
+        return executeInstruction(progData, execData);
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Runtime error\n" << e.what() << std::endl;
+        execData->halt = true;
+        return -1;
+    }
 }

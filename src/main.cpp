@@ -19,12 +19,13 @@ int main(int argc, char** argv) {
 
     if(file_name == "--introduction") {
         std::ofstream file("helloworld.lmn");
-        file << "println 'Hello, world!'\n";
-        file << "name = ''\n";
-        file << "print 'What`s your name? '\n";
-        file << "inputStr &name\n";
+        file << "println('Hello, world!')\n";
+        file << "\n";
+        file << "print('What`s your name? ')\n";
+        file << "name = inputStr()\n";
+        file << "\n";
         file << "greeting = 'Hello, ' .. name .. '!'\n";
-        file << "println greeting\n";
+        file << "println(greeting)\n";
         file.close();
 
         std::cout << "\nWelcome to LumenLang!\n";
@@ -46,7 +47,7 @@ int main(int argc, char** argv) {
             std::cout << "Generate an example:\n";
             std::cout << "  lumen --examples <name>\n\n";
             std::cout << "Example:\n";
-            std::cout << "  lumen --exampless fizzbuzz\n";
+            std::cout << "  lumen --examples fizzbuzz\n";
             std::cout << std::endl;
             return 0;
         } else if(argc == 3) {

@@ -18,5 +18,6 @@ void disassemble(std::vector<uint8_t> bytecode,
 bool loadDebugInfo(const std::string& data,
     std::unordered_map<int, std::string>& variables,
     std::unordered_map<std::string, RoutineInfo>& routines,
-    std::unordered_map<int, std::string>& funcList
+    std::unordered_map<int, std::string>& funcList,
+    std::unordered_map<int, std::string>& arrays
 );

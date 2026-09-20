@@ -10,14 +10,14 @@ int compileFromStream(std::istream& input,
     while (std::getline(input, line)) {
         allLines.push_back(line);
     }
-    prescanRoutines(allLines, compilerData);
-
     std::optional<CompileState> localState;
 
     CompileState& state =
         prevState ? *prevState : localState.emplace();
 
     state.ownFilename.push_back(fileName);
+
+    if (!prescanRoutines(allLines, compilerData, fileName)) return -1;
 
     bool subscript = prevState != nullptr;
 

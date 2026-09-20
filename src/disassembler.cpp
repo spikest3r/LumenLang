@@ -3,7 +3,8 @@
 bool loadDebugInfo(const std::string& data,
     std::unordered_map<int, std::string>& variables,
     std::unordered_map<std::string, RoutineInfo>& routines,
-    std::unordered_map<int, std::string>& funcList
+    std::unordered_map<int, std::string>& funcList,
+    std::unordered_map<int, std::string>& arrays
 ) {
     std::istringstream file(data);
 
@@ -43,6 +44,7 @@ bool loadDebugInfo(const std::string& data,
 
     // Exec Functions Section
     while (std::getline(file, line)) {
+        if (line == "arrays") break;
         if (line.empty()) continue;
         std::string name;
         int index;
@@ -50,6 +52,17 @@ bool loadDebugInfo(const std::string& data,
         std::stringstream ss(line);
         if (ss >> name >> index) {
             funcList[index] = name;
+        }
+    }
+
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        std::string name;
+        int index;
+
+        std::stringstream ss(line);
+        if (ss >> name >> index) {
+            arrays[index] = name;
         }
     }
 
@@ -78,11 +91,12 @@ void disassemble(std::vector<uint8_t> bytecode,
     std::unordered_map<int, std::string> variables_debug;
     std::unordered_map<std::string, RoutineInfo> routines_debug;
     std::unordered_map<int, std::string> funcList_debug;
+    std::unordered_map<int, std::string> arrays_debug;
     std::unordered_map<uint32_t, std::string> routineStarts;
     bool hasDebugData = false;
 
     if (!debugData.empty()) {
-        bool success = loadDebugInfo(debugData, variables_debug, routines_debug, funcList_debug);
+        bool success = loadDebugInfo(debugData, variables_debug, routines_debug, funcList_debug, arrays_debug);
         if (success) {
             routineStarts = buildRoutineStarts(routines_debug);
             hasDebugData = true;
@@ -207,6 +221,19 @@ void disassemble(std::vector<uint8_t> bytecode,
                 }
                 else {
                     std::cout << " fn[" << static_cast<int>(funcIdx) << "]";
+                }
+            }
+            break;
+
+        case 0xDA:
+        case 0xDB:
+            if (offset > 1) {
+                uint8_t arrIdx = bytecode[PC + 1];
+                if (hasDebugData && arrays_debug.count(arrIdx)) {
+                    std::cout << " " << arrays_debug[arrIdx];
+                }
+                else {
+                    std::cout << " arr[" << static_cast<int>(arrIdx) << "]";
                 }
             }
             break;

@@ -11,7 +11,7 @@ int finalizeCompile(CompileState& state, CompilerData* compilerData,
 
     // Resolve Main Program Jumps
     for (const auto& it : state.unresolvedJumps) {
-        if (it.routineIndex == -1) {
+        if (!subscript && it.routineIndex == -1) {
             auto it2 = state.globalLabels.find(it.keyword);
             if (it2 != state.globalLabels.end()) {
                 patchUint32(compilerData->bytecode, it.location, static_cast<uint32_t>(it2->second));
@@ -65,7 +65,7 @@ int finalizeCompile(CompileState& state, CompilerData* compilerData,
             int rIdx = it2->second;
             uint32_t absAddress = static_cast<uint32_t>(routineOffsets[rIdx]);
 
-            if (it.routineIndex == -1) {
+            if (!subscript && it.routineIndex == -1) {
                 patchUint32(compilerData->bytecode, location, absAddress);
             }
             else {
@@ -87,7 +87,7 @@ int finalizeCompile(CompileState& state, CompilerData* compilerData,
             int rIdx = sigIt->second.index;
             uint32_t absAddress = static_cast<uint32_t>(routineOffsets[rIdx]);
 
-            if (it.routineIndex == -1) {
+            if (!subscript && it.routineIndex == -1) {
                 patchUint32(compilerData->bytecode, it.location, absAddress);
             }
             else {
@@ -119,7 +119,11 @@ int finalizeCompile(CompileState& state, CompilerData* compilerData,
         // Write exec functions
         debugFile << "exec" << std::endl;
         for (const auto& func : funcList) {
-            debugFile << func.first << " " << func.second.opcode << std::endl;
+            debugFile << func.first << " " << static_cast<int>(func.second.opcode) << std::endl;
+        }
+        debugFile << "arrays" << std::endl;
+        for (const auto& arr : compilerData->arrayMap) {
+            debugFile << arr.first << " " << arr.second << std::endl;
         }
 
         compilerData->debugData = debugFile.str();

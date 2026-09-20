@@ -1,6 +1,7 @@
 #include "vm.h"
 #include <stdexcept>
 #include <cstring>
+#include <algorithm>
 
 AddrTranslator::AddrTranslator(MemAllocator* allocator) {
     memory = allocator;
@@ -194,6 +195,21 @@ Variant AddrTranslator::arrayRead(int arrayIndex, int64_t index) {
         break;
     }
     return v;
+}
+
+std::vector<int> AddrTranslator::arrayIndices() {
+    std::vector<int> indices;
+    indices.reserve(arrays.size());
+    for(const auto& [idx, h] : arrays) indices.push_back(idx);
+    std::sort(indices.begin(), indices.end());
+    return indices;
+}
+
+size_t AddrTranslator::arrayLength(int arrayIndex) {
+    auto it = arrays.find(arrayIndex);
+    if(it == arrays.end()) return 0;
+    auto* hdr = static_cast<ArrayHeader*>(memory->deref(it->second));
+    return hdr ? hdr->length : 0;
 }
 
 // ---------------------------------------------------------------------

@@ -108,8 +108,6 @@ int resolveArrayIndex(std::string keyword, CompilerData* data) {
 }
 
 int resolveString(std::string str, CompilerData* data) {
-    replaceAll(str, "'", "");
-
     auto it = data->stringPoolMap.find(str);
 
     if (it != data->stringPoolMap.end()) {

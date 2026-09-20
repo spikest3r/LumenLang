@@ -1,48 +1,50 @@
 # CLI Reference
 
+```text
+lumen (file) [options]
 ```
-lumen <file> [options]
-```
 
-## Special first arguments
+The file comes first, options after it. With no options the file is compiled and then run.
 
-These take the place of a file name and short-circuit everything else:
-
-| Argument | Description |
+| Option | Meaning |
 |---|---|
-| `--introduction` | Write a starter `helloworld.lmn` to the current directory |
-| `--examples` | List all built-in examples |
-| `--examples <name>` | Write the named example to `<name>.lmn` |
-| `--help` | Print usage and exit |
-| `--version` | Print version, git branch, commit, and build date |
+| `--compile` | Compile the source file to `<file>.bin`. |
+| `--run` | Run a compiled program. Used alone, `file` must be a `.bin`; combined with `--compile`, the freshly written `<file>.bin` is run. |
+| `--disassemble` | Print the disassembly of a `.bin`. Cannot be combined with `--compile` or `--run`. |
+| `--debugger` | Run under the [interactive debugger](../debugging/interactive-debugger.md). Cannot be combined with `--compile` alone. |
+| `--no-debug` | Do not embed debug symbols in the compiled `.bin` (smaller file, no names in the disassembler or debugger). |
+| `--verbose` | Print prescan tokens, the emitted bytecode and execution progress. |
 
-## File flags
+Standalone commands (no file needed):
 
-Everything else takes `<file>` as the first argument, followed by any of:
-
-| Flag | Description |
+| Command | Meaning |
 |---|---|
-| `--verbose` | Print extra compiler/VM diagnostics, including the raw compiled bytecode |
-| `--compile` | Compile the source file to `<file>.bin` |
-| `--run` | Execute compiled bytecode |
-| `--disassemble` | Disassemble a compiled `.bin` file into readable instructions |
-| `--dbgsym` | Emit a `<file>.bin.dbg` debug symbols file alongside the bytecode |
-| `--debugger` | Run under the interactive [debugger](../debugging/interactive-debugger.md) |
+| `--help` | Print usage. |
+| `--version` | Print the language version, git branch, commit and build date. |
+| `--introduction` | Write a starter script `helloworld.lmn` to the current directory. |
+| `--examples` | List the bundled examples. |
+| `--examples <name>` | Write the named example to disk (`age.lmn`, `infinite.lmn`, `temperature.lmn`, `fizzbuzz.lmn`). |
 
-## Default behavior
-
-If you pass **no** `--compile`, `--run`, or `--disassemble` flag, Lumen compiles and runs the file in one shot:
+## Typical workflows
 
 ```bash
-lumen script.lmn
-# equivalent to:
-lumen script.lmn --compile --run
+lumen script.lmn                       # compile + run
+lumen script.lmn --compile             # writes script.lmn.bin
+lumen script.lmn.bin --run             # run the compiled program
+lumen script.lmn.bin --disassemble     # inspect the bytecode
+lumen script.lmn --debugger            # compile, then debug
+lumen script.lmn --compile --no-debug  # release build without symbols
 ```
 
-## Flag combination rules
+## Errors
 
-Lumen enforces a few sane combinations and will refuse to run with an error otherwise:
+Compile errors name the file and line and stop the build:
 
-- **`--disassemble` is exclusive.** It cannot be combined with `--compile` or `--run` — disassembling reads an existing `.bin` file, it doesn't produce or execute one.
-- **`--debugger` requires `--run`.** You can't compile-only into the debugger; the debugger attaches to execution.
-- **`--dbgsym` requires `--compile`.** Debug symbols are only generated as part of compilation.
+```text
+In file script.lmn
+  - Error on line 3
+    >>> argument count mismatch for 'println': expected 1, got 0
+Compilation failed!
+```
+
+Runtime errors print `Runtime error` (or `Function error` when a built-in fails) followed by a message, and the program stops. The process exit code is still 0.

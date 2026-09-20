@@ -1,37 +1,37 @@
 # Labels & Jumps
 
-Lumen has no dedicated loop keywords (`while`, `for`) — loops are built from `label` and `jump`, the same primitives the underlying [bytecode](../architecture/bytecode-format.md) exposes directly.
-
-## Unconditional jump
+`label <name>` marks a position and `jump <name>` transfers control to it unconditionally. The pair below is an infinite loop, see the [Labels & Jumps Demo](../examples/jump.md).
 
 ```lumen
-label repeat
-println 'Hello, world!'
-jump repeat
+label loop
+println('Hello, world!')
+jump loop
 ```
 
-`label <name>` marks a position in the program. `jump <name>` transfers control to it unconditionally. The pair above is an infinite loop — see the [Labels & Jumps Demo](../examples/jump.md) example.
-
-## Conditional jump
-
-Combine `jump` with an `if` block to build a real loop with an exit condition:
+Jumps can go forward or backward:
 
 ```lumen
 i = 0
-
-label loop
-
-println i
-
+label top
 i = i + 1
-
-if i < 10
-    jump loop
+if i < 3
+  jump top
 endif
+println(i)      # 3
 ```
-
-This counts from 0 to 9. The loop body runs, `i` increments, and the `if` decides whether to jump back to `label loop` or fall through and end the program.
 
 ## Scope
 
-Labels are program-global — a `jump` can target any `label` in the file, not just ones in the same block. This is what makes them powerful (and occasionally easy to misuse): there's no structural nesting enforced between a `label` and the `jump`s that target it, unlike `if`/`endif` or `routine`/`endroutine`.
+Labels in the main program are visible to the whole main program (including code brought in by [`import`](./imports.md)). Labels inside a routine or function are local to it. Jumping to a label in another scope is a compile error (`Label 'x' is not defined in global scope`).
+
+## Stopping the program
+
+`halt` stops execution immediately:
+
+```lumen
+println('done')
+halt
+println('never printed')
+```
+
+The program also ends when the last statement has run.

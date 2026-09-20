@@ -8,8 +8,7 @@ SCRIPT="./build/lumen"
 FILE="examples/fizzbuzz.lmn"
 
 EXPECTED=$(cat << 'EOF'
-N=
-1
+N=1
 2
 Fizz
 4

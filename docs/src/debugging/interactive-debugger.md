@@ -1,57 +1,68 @@
 # Interactive Debugger
 
-Lumen has a built-in step debugger (`src/debugvm.cpp`), reached via `--debugger` (which requires `--run`):
-
 ```bash
-lumen program.lmn --compile --dbgsym --run --debugger
+lumen program.lmn --debugger
 ```
 
-Compiling with `--dbgsym` first is optional but strongly recommended — without it, the debugger shows raw slot indices instead of your variable and routine names.
-
-## Starting up
-
-```
-Debugger active. 'help' for list of commands
->>
-```
+The program is compiled and then loaded under a command prompt. Execution does not start until you type `run`. Program input (`inputInt()`, `inputStr()`) is read from the same terminal as debugger commands. Compile without `--no-debug` to see variable and array names.
 
 ## Commands
 
-| Command | Description |
+| Command | Meaning |
 |---|---|
-| `run` | Begin bytecode execution |
-| `stop` | Stop execution |
-| `breakpoint set <address>` | Set a breakpoint at a bytecode offset |
-| `breakpoint remove <address>` | Remove a breakpoint |
-| `breakpoint list` | List all breakpoints |
-| `breakpoint clear` | Remove all breakpoints |
-| `pc` | Print the current program counter |
-| `pc <address>` | Set the program counter |
-| `step` / `s` | Execute a single instruction |
-| `continue` | Resume execution until the next breakpoint or halt |
-| `stack` | Print the operand stack, top to bottom |
-| `variables` | Print all variable slots and their current values |
-| `disassemble` | Show the disassembled bytecode, with the current PC marked |
-| `help` | Show the command list |
+| `run` | Start executing until a breakpoint or the end. |
+| `stop` | Stop execution. |
+| `breakpoint set <addr>` | Add a breakpoint at a hexadecimal address (as shown by the [disassembler](./disassembler.md)). |
+| `breakpoint remove <addr>` | Remove one breakpoint. |
+| `breakpoint list` | List breakpoints. |
+| `breakpoint clear` | Remove all breakpoints (asks to confirm). |
+| `pc` / `pc <addr>` | Show or set the program counter. |
+| `step` | Execute one instruction. |
+| `continue` | Resume after a breakpoint. |
+| `stack` | Show the operand stack, top first. |
+| `variables` | Show all variables, then all arrays with their length and contents. |
+| `disassemble` | Show the full disassembly. |
+| `profiling` | Toggle instruction-level profiling. |
+| `memory` | Show memory-allocator statistics. |
+| `help` | List the commands. |
+| `quit` / `exit` | Leave the debugger (asks to confirm if the program is still running). |
 
-## A typical session
+`stack`, `variables` and `step` need a running program: they answer `Execution has not started` before `run` or after the program finished. Stop at a breakpoint first.
 
+## Example
+
+For this program:
+
+```lumen
+scores[0] = 10
+scores[1] = 20
+names[0] = 'ann'
+i = 1
+x = scores[i] + 1
+println(x)
 ```
+
+```text
+>> breakpoint set 28
+Breakpoint set at 28
 >> run
 Executing...
 Breakpoint hit!
->> stack
-Stack (top to bottom):
-  [2] {int64: 5}  <- top
-  [1] {int64: 3}
-  [0] {string: "hello"}
 >> variables
 Variables:
-  [i] {int64: 5}
-  [result] {int64: 8}
->> step
+  [i] 1
+  [x] 21
+Arrays:
+  [scores] length 2: [10, 20]
+  [names] length 1: ['ann']
 >> continue
+21
 Execution finished
 ```
 
-Addresses for `breakpoint` and `pc` are bytecode offsets, not source line numbers — pair `--debugger` with `--disassemble` (or the debugger's own `disassemble` command) to find the offset you want to break at. If you compiled with `--dbgsym`, routine names shown by `disassemble` will help you find the offset where a particular routine begins.
+Arrays are listed by name with every element (strings are quoted). Without debug symbols the names are replaced by numbers.
+
+## Notes
+
+- Breakpoint addresses are instruction addresses; a breakpoint on an address in the middle of an instruction is never hit.
+- The debugger executes instructions one at a time and does not run the garbage collector.

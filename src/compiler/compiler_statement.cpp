@@ -1,6 +1,13 @@
 #include "compiler_internal.h"
 #include <cctype>
 
+static std::string trimSpaces(const std::string& s) {
+    size_t b = s.find_first_not_of(" \t");
+    if (b == std::string::npos) return "";
+    size_t e = s.find_last_not_of(" \t");
+    return s.substr(b, e - b + 1);
+}
+
 int compileLine(const std::string& currentLine, CompileState& state, CompilerData* compilerData,
     bool verbose, bool debugInfo
 ) {
@@ -80,6 +87,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
     Operation op = NONE;
     int funcIndex = 0;
     int conditionArgs = 0;
+    bool repeatComma = false;
     int varIndex_assign = 0;
     ConditionOp condOp = COP_NONE;
     bool isMainBody = !(state.inRoutine || state.inFunction);
@@ -127,6 +135,11 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
                 destination.push_back(tokens[i]);
             }
             
+            if(destination.size() == 1 && (destination[0][0] == '*' || destination[0][0] == '&')) {
+                printError("Cannot assign through a reference", state.lineIndex, state.ownFilename.back());
+                return -1;
+            }
+
             if(destination.size() == 1) {
                 // most likely regular expression
                 bytecode.push_back(0x02); // POP
@@ -456,9 +469,14 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
                 return -1;
             }
 
+            std::ifstream fileStream(file);
+            if(!fileStream.is_open()) {
+                printError("Cannot open imported file '" + file + "'", state.lineIndex, state.ownFilename.back());
+                return -1;
+            }
+
             // recursively compile next script
             state.importDepth++;
-            std::ifstream fileStream(file);
             int status = compileFromFile(fileStream, compilerData, verbose, debugInfo, file, &state);
             state.importDepth--;
             state.ownFilename.pop_back();
@@ -543,7 +561,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
             } else if (token == ",") {
                 if(argsOpen && callParenDepth == 0) {
                     if(op == SUBROUTINE) {
-                        state.subroutineInfoMap[state.routineIndex].args.push_back(state.functionArgument);
+                        state.subroutineInfoMap[state.routineIndex].args.push_back(trimSpaces(state.functionArgument));
                     } else {
                         try {
                             compileExpression(
@@ -616,9 +634,16 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
         break;
         case REPEAT:
         {
-            if (token == ",") continue; // skip delimiter char
-            if(conditionArgs > 2) {
-                printError("Too much arguments", state.lineIndex, state.ownFilename.back());
+            if (token == ",") {
+                if (conditionArgs != 1 || repeatComma) {
+                    printError("Syntax error", state.lineIndex, state.ownFilename.back());
+                    return -1;
+                }
+                repeatComma = true;
+                continue;
+            }
+            if(conditionArgs >= 2 || (conditionArgs == 1 && !repeatComma)) {
+                printError("Syntax error: repeat takes a single count and an optional iterator", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
             tokenStack.push_back(token);
@@ -673,7 +698,7 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
     case SUBROUTINE:
         if(!state.functionArgument.empty()) {
             if(op == SUBROUTINE) {
-                state.subroutineInfoMap[state.routineIndex].args.push_back(state.functionArgument);
+                state.subroutineInfoMap[state.routineIndex].args.push_back(trimSpaces(state.functionArgument));
             } else {
                 try {
                     compileExpression(
@@ -777,7 +802,11 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
     }
     case REPEAT: {
         // init var
-        auto variable = "cnt_" + std::to_string(state.blockDepth.size());
+        if (conditionArgs == 0 || (repeatComma && conditionArgs < 2)) {
+            printError("Syntax error", state.lineIndex, state.ownFilename.back());
+            return -1;
+        }
+        auto variable = "@cnt_" + std::to_string(isMainBody ? 0 : state.routineIndex + 1) + "_" + std::to_string(state.blockDepth.size());
         pushToStack("0", compilerData, bytecode);
         bytecode.push_back(0x02); // POP
         auto idx = resolveVariableIndex(variable, compilerData);

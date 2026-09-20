@@ -1,42 +1,33 @@
 # Disassembler
 
-`--disassemble` (`src/disassembler.cpp`) turns a compiled `.bin` file back into a readable instruction listing. It's read-only — it cannot be combined with `--compile` or `--run`.
-
 ```bash
-lumen program.lmn --compile --dbgsym
 lumen program.lmn.bin --disassemble
 ```
 
-## Reading the output
+Prints the address, raw bytes and mnemonic of every instruction. With [debug symbols](./debug-symbols.md) operands are shown by name.
 
-```
+```text
 ===== Main =====
-0x00000000: 03 02 00        | PUSH 0
-0x00000003: 02 00           | POP i
-0x00000005: 07 24 00 00 00  | CALL32 0x00000024
-0x0000000a: 03 03 00        | PUSH i
-...
+0x00000000: 03 02 00        | PUSH 2
+0x00000003: 03 02 01        | PUSH 3
+0x00000006: 07 0e 00 00 00  | CALL32 0x0000000e
+0x0000000b: 04 01           | EXEC println
+0x0000000d: ff              | HLT
 
-===== Routine show =====
-0x00000024: 03 03 00        | PUSH i
-0x00000027: 04 01           | EXEC println
-0x00000029: fe              | RET
+===== Routine add =====
+0x0000000e: 02 00           | POP b
+0x00000010: 02 01           | POP a
+0x00000012: 03 03 01        | PUSH a
+0x00000015: 03 03 00        | PUSH b
+0x00000018: a0              | ADD
+0x00000019: fe              | RET
+0x0000001a: fe              | RET
 ```
 
-Each line shows:
+- Routine bodies are appended after the main program. Each starts with a `===== Routine <name> =====` header when symbols are present.
+- `CALL32` and the jumps show their target address.
+- `PUSH` shows the value, string, constant or variable it pushes.
+- `EXEC` shows the built-in's name; `ARRWRITE` / `ARRREAD` show the array's name.
+- The same output is available inside the debugger with `disassemble`.
 
-1. The bytecode offset, in hex — this is the address you'd use with the debugger's `breakpoint` or `pc` commands.
-2. The raw operand bytes for that instruction.
-3. The mnemonic (see [Opcode Reference](../reference/opcodes.md)) and its decoded operand.
-
-Routine bodies are appended after the main program stream, and — if debug symbols are loaded — the disassembler prints a `===== Routine <name> =====` header right before the offset where each one begins.
-
-## With and without debug symbols
-
-If a matching `<binary>.dbg` file exists next to the file you're disassembling, it's loaded automatically (see [Debug Symbols](./debug-symbols.md)), and:
-
-- `POP`/`PUSH` operands referencing variables show the variable's original name instead of its slot index.
-- `CALL32` (or legacy `CALL`) shows the target routine's name instead of a bare offset.
-- `EXEC` shows the built-in function's name (`println`, `inputInt`, ...) instead of its numeric index.
-
-Without a `.dbg` file, you still get a complete, correct listing — just with numbers where names would be.
+Opcodes are listed in the [Opcode Reference](../reference/opcodes.md).

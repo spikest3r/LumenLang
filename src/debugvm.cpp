@@ -278,13 +278,15 @@ int run_debug(
     std::unordered_map<int, std::string> debugVariablesMap;
     std::unordered_map<std::string, RoutineInfo> debugRoutinesMap;
     std::unordered_map<int, std::string> debugFuncListMap;
+    std::unordered_map<int, std::string> debugArraysMap;
 
     if(!debugData.empty()) {
         debugSymbolsValid = loadDebugInfo(
             debugData,
             debugVariablesMap,
             debugRoutinesMap,
-            debugFuncListMap
+            debugFuncListMap,
+            debugArraysMap
         );
     }
 
@@ -526,6 +528,21 @@ int run_debug(
                             << variantToString(variant);
                     std::cout << "\n";
                 }
+                auto arrayIdxs = execData.translator.arrayIndices();
+                if (!arrayIdxs.empty()) {
+                    std::cout << "Arrays:\n";
+                    for (int arrIdx : arrayIdxs) {
+                        auto arrName = (debugSymbolsValid && debugArraysMap.count(arrIdx))
+                            ? debugArraysMap[arrIdx] : std::to_string(arrIdx);
+                        size_t arrLen = execData.translator.arrayLength(arrIdx);
+                        std::cout << "  [" << arrName << "] length " << arrLen << ": [";
+                        for (size_t i = 0; i < arrLen; i++) {
+                            if (i > 0) std::cout << ", ";
+                            std::cout << variantToString(execData.translator.arrayRead(arrIdx, static_cast<int64_t>(i)));
+                        }
+                        std::cout << "]\n";
+                    }
+                }
             }
         }
         else if(command == "disassemble") {
@@ -586,9 +603,8 @@ void printHelp() {
     std::cout << "step - Step one instruction" << std::endl;
     std::cout << "continue - Continue execution" << std::endl;
     std::cout << "stack - Show stack contents" << std::endl;
-    std::cout << "variables - Show all variables and their content" << std::endl;
+    std::cout << "variables - Show all variables, arrays and their content" << std::endl;
     std::cout << "disassemble - View full disassembly" << std::endl;
-    std::cout << "debugsymbols - Specify debug symbols file" << std::endl;
     std::cout << "profiling - Toggle instruction-level profiling" << std::endl;
     std::cout << "memory - View advanced memory metrics" << std::endl;
 }

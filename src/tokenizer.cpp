@@ -20,7 +20,9 @@ bool isIdentChar(unsigned char c) {
 bool isOperandEndToken(const std::string& t) {
     if (t.empty()) return false;
     if (t == "(" || t == "," || t == "+" || t == "-" || t == "*" || t == "/" ||
-        t == "%" || t == " .. ") {
+        t == "%" || t == " .. " || t == "^" || t == "=" || t == "==" || t == "!=" ||
+        t == ">" || t == "<" || t == ">=" || t == "<=" || t == "[" || t == "&" ||
+        t == "if" || t == "elif" || t == "while" || t == "return" || t == "repeat") {
         return false;
     }
     return true;
@@ -114,10 +116,14 @@ std::vector<std::string> tokenizeFormula(std::string formula) {
             continue;
         }
 
-        if (c == '*' && token.empty() && !isOperandEndToken(tokens.empty() ? "" : tokens.back())) {
-            // dereference prefix: '*' at start of an operand position
-            token += c;
-            continue;
+        if (c == '&' || c == '*') {
+            if (!token.empty() && !isIdentChar(static_cast<unsigned char>(token.back()))) {
+                flush();
+            }
+            if (token.empty() && (c == '&' || !isOperandEndToken(tokens.empty() ? "" : tokens.back()))) {
+                token += c;
+                continue;
+            }
         }
 
         if (c == '+' || c == '-' || c == '*' || c == '/' || c == '%') {
@@ -132,8 +138,9 @@ std::vector<std::string> tokenizeFormula(std::string formula) {
                         [](unsigned char ch) { return std::isdigit(ch); });
 
         if (isIdentChar(static_cast<unsigned char>(c))) {
+            bool pendingPrefix = token.size() == 1 && (token[0] == '*' || token[0] == '&');
             if (!token.empty() && !isIdentChar(static_cast<unsigned char>(token.back())) &&
-                !tokenIsNumericInProgress) {
+                !tokenIsNumericInProgress && !pendingPrefix) {
                 flush();
             }
             token += c;

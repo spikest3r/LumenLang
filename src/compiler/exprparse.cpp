@@ -1,5 +1,25 @@
 #include "compiler.h"
 
+static std::string unescapeString(const std::string& in) {
+    std::string out;
+    for (size_t i = 0; i < in.size(); i++) {
+        if (in[i] == '\\' && i + 1 < in.size()) {
+            char n = in[i + 1];
+            switch (n) {
+            case 'n': out += '\n'; i++; continue;
+            case 't': out += '\t'; i++; continue;
+            case 'r': out += '\r'; i++; continue;
+            case '\\': out += '\\'; i++; continue;
+            case '\'': out += '\''; i++; continue;
+            case '"': out += '"'; i++; continue;
+            default: break;
+            }
+        }
+        out += in[i];
+    }
+    return out;
+}
+
 static bool isNum(const std::string &s) {
     if (s.empty()) return false;
     try {
@@ -52,6 +72,10 @@ static std::vector<std::string> tokenize(const std::string &expr) {
             literal += quote; // keep opening quote
             size_t j = i + 1;
             for (; j < expr.size() && expr[j] != quote; j++) {
+                if (expr[j] == '\\' && j + 1 < expr.size()) {
+                    literal += expr[j];
+                    j++;
+                }
                 literal += expr[j];
             }
             if (j < expr.size()) literal += expr[j]; // keep closing quote
@@ -367,7 +391,7 @@ static void evalRPN(const std::vector<std::string> &rpn, CompilerData* data, std
 
             stack.push_back(t); // Placeholder for the fetched array value
         } else if (isStringLit(t)) {
-            std::string value = t.substr(1, t.size() - 2); // strip quotes
+            std::string value = unescapeString(t.substr(1, t.size() - 2));
             int constIndex = resolveString(value, data);
 
             bytecode.push_back(0x03);

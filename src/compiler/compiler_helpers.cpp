@@ -14,9 +14,11 @@ void patchUint32(std::vector<uint8_t>& bytecode, int location, uint32_t value) {
     bytecode[location + 3] = (value >> 24) & 0xFF;
 }
 
-void prescanRoutines(const std::vector<std::string>& lines, CompilerData* compilerData) {
-    int routineIndex = 0;
+bool prescanRoutines(const std::vector<std::string>& lines, CompilerData* compilerData, const std::string& fileName) {
+    int routineIndex = static_cast<int>(compilerData->routineList.size());
+    int lineNo = 0;
     for (const auto& line : lines) {
+        lineNo++;
         auto tokens = tokenizeFormula(line);
         if (tokens.empty() || (tokens[0] != "routine" && tokens[0] != "function")) continue;
         if (tokens.size() < 2) continue; // malformed; let the main pass report the error
@@ -39,9 +41,15 @@ void prescanRoutines(const std::vector<std::string>& lines, CompilerData* compil
         }
         int argCount = sawAnyArgToken ? commas + 1 : 0;
 
+        if (compilerData->routineList.count(name)) {
+            printError("Routine '" + name + "' is already defined", lineNo, fileName);
+            return false;
+        }
+
         compilerData->routineList[name] = RoutineSignature{routineIndex, argCount, returnable};
         routineIndex++;
     }
+    return true;
 }
 
 void printError(std::string error, int line, std::string file) {
@@ -53,7 +61,7 @@ void pushToStack(std::string token, CompilerData* data, std::vector<uint8_t>& by
     bytecode.push_back(0x03); // PUSH opcode
 
     if (token.starts_with("'")) {
-        auto strIndex = resolveString(token, data);
+        auto strIndex = resolveString(token.substr(1, token.size() > 1 ? token.size() - 2 : 0), data);
         bytecode.push_back(0x01); // operand type: string
         bytecode.push_back(static_cast<uint8_t>(strIndex));
     }
