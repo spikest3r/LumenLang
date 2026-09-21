@@ -2,17 +2,16 @@
 
 A lightweight, stack-based scripting language with a custom compiler, bytecode format, and virtual machine written in C++20.
 
-Lumen is designed to be simple to learn while still exposing the concepts behind real programming languages: compilation, bytecode execution, virtual machines, debugging, and optimization.
+Lumen is designed to be simple to learn while still exposing the concepts behind real programming languages: compilation, bytecode execution, virtual machines, debugging, and memory management.
 
-```text
-println 'Hello, world!'
+```lumen
+println('Hello, world!')
 
-name = ''
-print 'What`s your name? '
-inputStr &name
+print('What`s your name? ')
+name = inputStr()
 
 greeting = 'Hello, ' .. name .. '!'
-println greeting
+println(greeting)
 ```
 
 Output:
@@ -27,27 +26,26 @@ Hello, Ryan!
 
 ### Language
 
-- Variables and dynamic values
+- Variables and dynamic values (integers, floats, strings)
 - Integer and floating-point arithmetic
-- String manipulation
-- String concatenation with `..`
+- String concatenation with `..` and escape sequences
 - Conditional execution with `if`, `elif`, `else`
-- While loops and repeat loops
-- Loop control (`break`, `continue`)
-- Labels and jumps
-- User-defined routines
+- `while` loops and `repeat` loops with `break` / `continue`
+- Labels, jumps and `halt`
+- Routines and functions with parameters and return values
+- Growable arrays
+- Script imports
 - References and dereferencing
 - References and dereferencing
 - Console input/output
 - Comments
-- Inline condition expressions
 
 ### Standard Library
 
 - File I/O (open, read, write, close)
 - Random number generation
 - HTTP requests (GET, POST, PUT, DELETE)
-- Capability-gated access to sensitive builtins
+- Capability assertions for host-provided features
 - String inspection and manipulation
 
 ### Standard Library
@@ -62,18 +60,17 @@ Hello, Ryan!
 
 - Compile `.lmn` source files into bytecode
 - Execute precompiled bytecode files
-- Custom stack-based virtual machine
+- Stack-based virtual machine
+- Managed heap with a mark-and-sweep garbage collector
 - Bytecode disassembler
-- Debug symbol generation
-- Built-in debugger
-- Runtime tracing
+- Inline debug symbols (variables, routines, built-ins, arrays)
+- Interactive debugger
 - Verbose compilation mode
 
 ### Developer Experience
 
-- Interactive introduction command
+- Starter program generator
 - Built-in example generator
-- Beginner-friendly CLI
 - Self-contained toolchain
 
 ## Getting Started
@@ -139,21 +136,23 @@ lumen fizzbuzz.lmn
 lumen <file> [options]
 ```
 
+The file comes first, options after it.
+
 Options:
 
 | Option | Description |
 |--------|-------------|
-| `--verbose` | Enable verbose compiler output |
-| `--compile` | Compile source file |
-| `--run` | Execute compiled bytecode |
-| `--disassemble` | Show bytecode instructions |
-| `--dbgsym` | Generate debug symbols |
-| `--debugger` | Run with debugger |
-| `--introduction` | Create a starter project |
+| `--verbose` | Enable verbose compiler and VM output |
+| `--compile` | Compile the source file to `<file>.bin` |
+| `--run` | Execute compiled bytecode (a `.bin`, or the file just compiled) |
+| `--disassemble` | Show the bytecode instructions of a `.bin` |
+| `--no-debug` | Do not embed debug symbols in the compiled `.bin` |
+| `--debugger` | Run with the interactive debugger |
+| `--introduction` | Create a starter program |
 | `--examples` | List or generate examples |
 | `--version` | Show version, branch, commit, and build date |
 
-If no option is provided, Lumen compiles and runs the source file automatically.
+If no option is provided, Lumen compiles and runs the source file automatically. Debug symbols are embedded by default.
 
 ## Language Syntax
 
@@ -162,7 +161,7 @@ If no option is provided, Lumen compiles and runs the source file automatically.
 ```lumen
 # This is a comment
 
-println 'Hello!' # Inline comments work too
+println('Hello!') # Inline comments work too
 ```
 
 ### Variables
@@ -171,33 +170,35 @@ println 'Hello!' # Inline comments work too
 number = 42
 result = number + 10
 
-println result
+println(result)
 ```
 
-Numbers can be integers or floats. A literal is treated as a float if it contains a decimal point or an exponent (`3.14`, `1e-2`); otherwise it's an integer:
+Numbers can be integers or floats. A literal is treated as a float if it contains a decimal point; otherwise it's an integer:
 
 ```lumen
 pi = 3.14159
 half = 1 / 2
 
-println pi
-println half
+println(pi)
+println(half)
 ```
 
 Mixing an int and a float in an expression promotes the result to a float:
 
 ```lumen
 total = 10 + 2.5
-println total # 12.5
+println(total) # 12.5
 ```
+
+All variables are global. Reading a variable that was never assigned gives `0`.
 
 ### Strings
 
-Strings use single quotes:
+Strings use single or double quotes:
 
 ```lumen
 message = 'Hello, Lumen!'
-println message
+println(message)
 ```
 
 Concatenation:
@@ -206,52 +207,52 @@ Concatenation:
 name = 'Ryan'
 text = 'Hello, ' .. name
 
-println text
+println(text)
+```
+
+Escape sequences `\n`, `\t`, `\r`, `\\`, `\'` and `\"` are supported:
+
+```lumen
+println('it\'s a\ttab')
 ```
 
 ### Input
 
-Read a string:
+Input functions return the value that was read:
 
 ```lumen
-name = ''
+name = inputStr()
+age = inputInt()
 
-inputStr &name
-
-println name
-```
-
-Read an integer:
-
-```lumen
-inputInt &age
+println(name)
+println(age)
 ```
 
 ### Conditions
 
 ```lumen
 if age >= 18
-    println 'Adult'
+    println('Adult')
 elif age >= 13
-    println 'Teenager'
+    println('Teenager')
 else
-    println 'Child'
+    println('Child')
 endif
 ```
 
-Conditions support inline expressions:
+A condition holds one comparison; there is no `and` / `or`, so nest `if` blocks instead. Conditions support full expressions:
 
 ```lumen
 number = 15
 
 if number % 15 == 0
-    println 'Divisible by 15'
+    println('Divisible by 15')
 elif number % 3 == 0
-    println 'Divisible by 3'
+    println('Divisible by 3')
 elif number % 5 == 0
-    println 'Divisible by 5'
+    println('Divisible by 5')
 else
-    println 'Not divisible by 3 or 5'
+    println('Not divisible by 3 or 5')
 endif
 ```
 
@@ -263,36 +264,26 @@ endif
 i = 0
 
 while i < 10
-    println i
+    println(i)
     i = i + 1
 endwhile
 ```
 
 #### Repeat Loop
 
-Repeat a block a fixed number of times:
+Repeat a block a fixed number of times. The count is a single number or variable:
 
 ```lumen
 repeat 5
-    println 'Hello'
+    println('Hello')
 endrepeat
 ```
 
-With built-in iterator, the loop variable is automatically initialized and incremented:
+With a built-in iterator, the loop variable receives the iteration number, starting at 0:
 
 ```lumen
 repeat 5, i
-    println i
-endrepeat
-```
-
-This is equivalent to:
-
-```lumen
-i = 0
-repeat 5
-    println i
-    i = i + 1
+    println(i)
 endrepeat
 ```
 
@@ -307,7 +298,7 @@ while i < 100
     if i == 5
         break
     endif
-    println i
+    println(i)
     i = i + 1
 endwhile
 ```
@@ -319,18 +310,18 @@ repeat 10, i
     if i % 2 == 0
         continue
     endif
-    println i
+    println(i)
 endrepeat
 ```
 
-#### Labels and Jumps (Legacy)
+#### Labels and Jumps
 
 ```lumen
 i = 0
 
 label loop
 
-println i
+println(i)
 
 i = i + 1
 
@@ -339,17 +330,51 @@ if i < 10
 endif
 ```
 
-### Routines
+`halt` stops the program immediately.
+
+### Routines and Functions
+
+A routine performs actions; a function also returns a value:
 
 ```lumen
-routine hello
-
-println 'Hello from a routine!'
-
+routine greet(name, times)
+    repeat times
+        println('Hello, ' .. name)
+    endrepeat
 endroutine
 
-call hello
+function add(a, b)
+    return a + b
+endfunction
+
+greet('Ann', 2)
+total = add(2, 3)
+println(total)
 ```
+
+Parameters are ordinary global variables assigned on entry; there is no local scope.
+
+### Arrays
+
+Arrays are named, untyped and grow on demand. Writing to an index creates the array:
+
+```lumen
+scores[0] = 10
+scores[1] = 20
+scores[2] = scores[0] + scores[1]
+
+println(scores[2]) # 30
+```
+
+Reading a missing array or an index out of range is a runtime error.
+
+### Imports
+
+```lumen
+import 'lib.lmn'
+```
+
+The imported script is compiled into the program at that point. Its routines, functions, variables and labels share the global scope.
 
 ### References and Dereferencing
 
@@ -357,24 +382,27 @@ call hello
 value = 20
 
 ref = &value
+value = 30
 
-deref = *ref
+println(*ref) # 30
 ```
 
 ## Built-in Functions
+
+Functions that return a value are used in expressions, for example `n = str2int('42')`.
 
 ### Core
 
 | Function | Description |
 |----------|-------------|
-| `print value` | Print without newline |
-| `println value` | Print with newline |
-| `inputInt &out` | Read integer input |
-| `inputStr &out` | Read string input |
-| `int2str in, &out` | Convert integer to string |
-| `str2int in, &out` | Convert string to integer |
-| `float2str in, &out` | Convert float to string |
-| `str2float in, &out` | Convert string to float |
+| `print(value)` | Print without newline |
+| `println(value)` | Print with newline |
+| `inputInt()` | Read an integer, returns it (`0` if invalid) |
+| `inputStr()` | Read one word, returns it |
+| `int2str(n)` | Convert integer to string |
+| `str2int(s)` | Convert string to integer (runtime error if invalid) |
+| `float2str(x)` | Convert number to string |
+| `str2float(s)` | Convert string to float (`0` if invalid) |
 
 ### Pico native functions
 
@@ -390,63 +418,65 @@ deref = *ref
 
 ### Capabilities
 
-Some builtins require a capability to be asserted before use. Attempting to use a gated feature without asserting its capability first raises a runtime error.
+A script can declare the host features it needs. If the host does not provide the capability, the program stops with an error.
 
 | Function | Description |
 |----------|-------------|
-| `assertCapability name` | Assert that a capability (e.g. `'FS'`, `'random'`, `'HTTP'`) is available |
+| `assertCapability(name)` | Assert that a capability (e.g. `'FS'`, `'random'`, `'HTTP'`) is available |
 
 ### File I/O
 
-Requires the `FS` capability.
-
 | Function | Description |
 |----------|-------------|
-| `openFile path, &handle` | Open a file, returns a handle |
-| `writeFile data, handle` | Write a string to an open file |
-| `readFile &out, handle` | Read the full contents of an open file |
-| `closeFile handle` | Close an open file handle |
+| `openFile(path)` | Open a file for reading and writing (created if missing, contents kept), returns a handle |
+| `writeFile(data, handle)` | Append a string to an open file |
+| `readFile(handle)` | Return the full contents of an open file |
+| `closeFile(handle)` | Close an open file handle |
+
+```lumen
+h = openFile('log.txt')
+writeFile('hello\n', h)
+println(readFile(h))
+closeFile(h)
+```
 
 ### Random
 
-Requires the `random` capability.
-
 | Function | Description |
 |----------|-------------|
-| `randomSeed seed` | Seed the random number generator |
-| `random &out` | Generate a random float in `[0.0, 1.0)` |
-| `randomRange min, max, &out` | Generate a random integer in `[min, max]` (inclusive) |
+| `randomSeed(seed)` | Seed the random number generator |
+| `random()` | Random float in `[0.0, 1.0)` |
+| `randomRange(min, max)` | Random integer in `[min, max]` (inclusive) |
 
 ### HTTP
 
-Requires the `HTTP` capability.
-
 | Function | Description |
 |----------|-------------|
-| `httpRequest method, url, headers, body, &status, &response` | Perform an HTTP request |
+| `httpRequest(method, url, headers, body, &response)` | Perform an HTTP request, returns the status code |
 
 - `method` — `'GET'`, `'POST'`, `'PUT'`, or `'DELETE'` (case-insensitive)
 - `url` — full URL including scheme, e.g. `'http://example.com/path'`
 - `headers` — newline-separated `Key: Value` pairs, or `''` for none
 - `body` — request body string, ignored for `GET`
-- `status` — receives the HTTP status code, or `-1` on a connection-level failure
-- `response` — receives the response body, or an error message on failure
+- `&response` — reference to the variable that receives the response body, or an error message on failure
+- return value — the HTTP status code, or `-1` on a connection-level failure
 
 ```lumen
-assertCapability 'HTTP'
+assertCapability('HTTP')
 
-httpRequest 'GET', 'http://example.com/', '', '', &status, &body
+body = ''
+status = httpRequest('GET', 'http://example.com/', '', '', &body)
 
-int2str status, &statusStr
-println 'Status: ' .. statusStr
-println body
+println('Status: ' .. status)
+println(body)
 ```
 
 ```lumen
-assertCapability 'HTTP'
+assertCapability('HTTP')
 
-httpRequest 'POST', 'http://httpbin.org/post', 'Content-Type: application/json', '{"key":"value"}', &status, &body
-println body
+body = ''
+status = httpRequest('POST', 'http://httpbin.org/post', 'Content-Type: application/json', '{"key":"value"}', &body)
+println(body)
 ```
 
 > HTTPS URLs are not currently supported — only plain `http://` requests.
@@ -455,29 +485,18 @@ println body
 
 | Function | Description |
 |----------|-------------|
-| `strlen s, &out` | Length of a string |
-| `substr s, start, len, &out` | Extract a substring |
-| `strfind s, needle, &out` | Index of the first occurrence of `needle` in `s`, or `-1` if not found |
-| `strcase s, upper, &out` | Convert case: `upper = 1` for uppercase, `0` for lowercase |
-| `trim s, &out` | Strip leading and trailing whitespace |
+| `strlen(s)` | Length of a string |
+| `substr(s, start, len)` | Extract a substring |
+| `strfind(s, needle)` | Index of the first occurrence of `needle` in `s`, or `-1` if not found |
+| `strcase(s, upper)` | Convert case: `upper = 1` for uppercase, `0` for lowercase |
+| `trim(s)` | Strip leading and trailing whitespace |
 
 ```lumen
-strlen 'hello world', &len
-int2str len, &lenStr
-println 'Length: ' .. lenStr
-
-substr 'hello world', 6, 5, &sub
-println 'Substring: ' .. sub
-
-strfind 'hello world', 'world', &idx
-int2str idx, &idxStr
-println 'Found at: ' .. idxStr
-
-strcase 'Hello World', 1, &upper
-println upper
-
-trim '   padded   ', &trimmed
-println '[' .. trimmed .. ']'
+println('Length: ' .. strlen('hello world'))
+println('Substring: ' .. substr('hello world', 6, 5))
+println('Found at: ' .. strfind('hello world', 'world'))
+println(strcase('Hello World', 1))
+println('[' .. trim('   padded   ') .. ']')
 ```
 
 ## Operators
@@ -493,7 +512,7 @@ println '[' .. trimmed .. ']'
 ^
 ```
 
-Arithmetic works across ints and floats. `/` always produces a float; the other operators return a float if either operand is a float, and an int otherwise.
+Arithmetic works across ints and floats. `/` always produces a float; the other operators return a float if either operand is a float, and an int otherwise. Arithmetic on a string is a runtime error.
 
 ### Comparison
 
@@ -526,14 +545,14 @@ Source Code (.lmn)
      Output
 ```
 
-The VM is stack-based and executes custom bytecode instructions.
+The VM is stack-based and executes custom bytecode instructions. Variables and arrays live in a managed heap that is reclaimed by a mark-and-sweep garbage collector. Each program can use at most 256 variables, 256 arrays, 256 string literals and 256 numeric constants.
 
 ## Debugging
 
-Compile with debug symbols:
+Compiled programs carry debug symbols by default. Skip them with:
 
 ```bash
-lumen program.lmn --dbgsym
+lumen program.lmn --compile --no-debug
 ```
 
 Run in debugger mode:
@@ -545,7 +564,19 @@ lumen program.lmn --debugger
 Inspect bytecode:
 
 ```bash
-lumen program.lmn --disassemble
+lumen program.lmn --compile
+lumen program.lmn.bin --disassemble
+```
+
+Inside the debugger, `variables` lists variables and arrays with their names and contents.
+
+## Documentation
+
+The full guide lives in `docs/` and is built with [mdBook](https://rust-lang.github.io/mdBook/):
+
+```bash
+cd docs
+mdbook build
 ```
 
 ## Examples
@@ -580,7 +611,7 @@ Lumen is built to explore:
 - How programming languages work
 - Compiler design
 - Bytecode formats
-- Virtual machines
+- Virtual machines and memory management
 - Debugging systems
 - Language tooling
 

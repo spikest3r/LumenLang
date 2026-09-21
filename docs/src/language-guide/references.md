@@ -1,20 +1,31 @@
 # References & Dereferencing
 
-Lumen variables can be referenced and dereferenced directly, independent of the `&var` syntax used to pass output parameters to built-ins.
+A **reference** is the address (slot number) of a variable.
+
+| Syntax | Meaning |
+|---|---|
+| `&x` | the reference to variable `x` |
+| `*r` | the current value of the variable that `r` refers to |
 
 ```lumen
-value = 20
-
-ref = &value
-
-deref = *ref
+x = 10
+r = &x
+println(*r)      # 10
+x = 20
+println(*r)      # 20
+println(*r + 1)  # 21
 ```
 
-| Operator | Meaning |
-|---|---|
-| `&value` | Take a reference to a variable's storage slot |
-| `*ref` | Dereference — read the value a reference points to |
+A reference is stored as a plain integer, so `println(r)` prints a slot number. `*r` can be used anywhere an expression is allowed (assignments, arguments, conditions):
 
-A reference can be stored in a variable like any other value and passed around, then dereferenced later with `*` to read the current contents of the variable it points to.
+```lumen
+if *r == 20
+  println('twenty')
+endif
+```
 
-> Currently, dereferenced assignments (e.g. `*ref = 10`) are not supported.
+## Rules
+
+- Assigning *through* a reference (`*r = 5`) is not supported and is a compile error.
+- Dereferencing a reference to a variable that was never assigned stops the program.
+- References are how built-ins return extra values. `httpRequest` writes the response body into the variable you pass with `&`, see [Standard Library](./standard-library.md#http).

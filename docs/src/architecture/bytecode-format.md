@@ -1,66 +1,62 @@
 # Bytecode Format
 
+## The .bin container
+
+All integers are little-endian.
+
+| Field | Size | Notes |
+|---|---|---|
+| Signature | 2 bytes | `FE FF` for the current format. |
+| Bytecode size | int32 | |
+| Bytecode | n bytes | |
+| String pool size | int32 | number of strings |
+| String entries | repeated | int32 length + bytes |
+| Constant pool size | int32 | number of constants |
+| Constants | repeated | 8-byte doubles |
+| Variable count | int32 | |
+| Debug data size | int32 | `0` with `--no-debug` |
+| Debug data | n bytes | text, see [Debug Symbols](../debugging/debug-symbols.md) |
+
+Signatures the loader understands: `FE FB` (v2), `FE FC` (v2.1, double constants), `FE FD` (v2.2, 32-bit addressing), `FE FE` (v3) and `FE FF` (v4, current). `FE FA` (v1) is rejected. Older files load without debug data, because the trailing debug section is optional.
+
+## Values on the stack (Variant)
+
+The VM stack holds tagged values: integer (`int64`), float (`double`) or string. An internal array tag exists for the memory manager but arrays are not first-class values.
+
 ## Instruction encoding
 
-Lumen's bytecode is not byte-packed — it's a flat `std::vector<uint8_t>`. Each instruction is one or more `uint8_t`s: an opcode, followed by however many operand ints that opcode needs. There's no length prefix per instruction; the VM knows how many operands to consume from the opcode alone, via `getOpCodeOffset()`.
+Instructions are a one-byte opcode followed by byte operands:
 
-For the full opcode table, see [Opcode Reference](../reference/opcodes.md).
+- Variable, string, constant and array operands are **one byte** (an index into its pool), which is why a program can use at most 256 of each.
+- Jump and call targets are **four bytes** (`uint32`). Legacy 8-bit jump forms remain in the opcode table.
+- Jump targets inside a routine are relative to the start of that routine; the VM adds the routine's base address.
 
-## The `.bin` container
+## PUSH type tags
 
-Compiled programs are written to disk with `BinaryProgram::save()` (`src/programfile.cpp`) in a small custom binary format:
+`PUSH` is three bytes: opcode, a tag, and an operand.
 
-| Field | Type | Description |
-|---|---|---|
-| Signature | 2 bytes | `0xFE 0xFA` (v1) / `0xFE 0xFB` (v2) / `0xFE 0xFC` (v3) / `0xFE 0xFD` (v4, current) — validated on load (see below), load fails if it doesn't match a known signature |
-| Bytecode length | `int32` | Number of ints in the bytecode stream |
-| Bytecode | `uint8_t[length]` | The instruction stream itself |
-| String pool size | `int32` | Number of pooled string literals |
-| String pool entries | repeated `{int32 len, char[len]}` | Each string literal, length-prefixed, **not** null-terminated |
-| Const pool size | `int32` | Number of pooled constants |
-| Const pool entries | `double[length]` (v3) / `int32[length]` (v2 and earlier) | Shared integer + float constant array — see below |
-| Variable count | `int32` | Number of variable slots to allocate at VM startup |
-
-This is the entire file — no header versioning beyond the 2-byte signature, no section table. It's deliberately minimal.
-
-### Signature versions and backward compatibility
-
-`BinaryProgram::load()` (`src/programfile.cpp`) checks the signature's second byte to decide how to read the const pool:
-
-- **`0xFE 0xFA` (v1)** — refused outright; `load()` prints a message that v1 binaries aren't compatible with the current runtime and fails.
-- **`0xFE 0xFB` (v2)** — const pool entries are read as `int32`, then widened to `double` on load, so old integer-only bytecode still runs correctly on the current VM.
-- **`0xFE 0xFC` (v3)** — const pool entries are read directly as `double`.
-- **`0xFE 0xFD` (v4, "32-bit addressing")** — const pool is read identically to v3 (directly as `double`). The version bump reflects a *bytecode* change, not a container change: the compiler now emits the 32-bit-offset jump/call opcodes (`JUMP32`, `CALL32`, `JEQ32`...`JNE32`) instead of their 8-bit predecessors, so program size is no longer capped at 255 bytes for jump targets — see [Opcode Reference](../reference/opcodes.md#8-bit-vs-32-bit-addressing). This is the format the current compiler writes.
-
-Everything else in the file (bytecode, string pool, variable count) is unchanged across versions — only the const pool's on-disk element type (v2 vs. v3/v4) and the bytecode's addressing width (pre-v4 vs. v4) differ.
-
-## The string pool
-
-Every string literal in the source is deduplicated into a single pool during compilation (`resolveString()` in `src/helpers.cpp`); a `PUSH` instruction for a string operand carries an index into this pool rather than embedding the text inline in the bytecode stream.
+| Tag | Operand |
+|---|---|
+| `0x01` | index into the string pool |
+| `0x02` | index into the integer constant pool |
+| `0x03` | variable slot to read |
+| `0x04` | an immediate integer (used for references `&x` and the operand count of `JOIN`) |
+| `0x05` | index into the float constant pool |
 
 ## The const pool
 
-Integer and float literals share a single deduplicated pool (`resolveConst()` in `src/helpers.cpp`), keyed on `(TypeTag, value)` so an int `2` and a float `2.0` get distinct entries even though they'd compare equal as raw numbers. A `PUSH` instruction carries the pool index plus a type tag (`0x02` for int, `0x05` for float — see [Opcode Reference](../reference/opcodes.md#push-type-tags)) that tells the VM how to reinterpret the stored `double` when it lands on the stack.
+Numbers that appear in source are stored once, in the constant pool, and pushed by index. Floats are stored as doubles.
 
-## Variables are slots, not names
+## Program layout
 
-By the time a program reaches the `.bin` file, variable names are gone — the compiler maps each name to an integer slot index (`resolveVariableIndex()`), and the VM allocates a flat `std::vector<Variant>` of that size at startup. This is why a `.bin` file alone is unreadable to a human: `--disassemble` will show you `variable index 3`, not the original name. To get names back, you need the separate debug symbols file — see [Debug Symbols](../debugging/debug-symbols.md).
-
-## Values on the stack: `Variant`
-
-Every value that moves through the VM — on the stack or in a variable slot — is a tagged union (`include/types.h`):
-
-```cpp
-typedef enum {
-    TAG_INT = 2,
-    TAG_FLOAT = 3,
-    TAG_STRING = 1
-} TypeTag;
-
-typedef struct {
-    TypeTag type;
-    std::variant<int64_t, double, std::string> data;
-} Variant;
+```text
+main program ... HLT
+routine 0 body ... RET
+routine 1 body ... RET
 ```
 
-Arithmetic and comparison opcodes read both `TAG_INT` and `TAG_FLOAT` operands, promoting to `double` whenever either side is a float (see [Opcode Reference](../reference/opcodes.md#arithmetic) for the exact per-opcode behavior, including `DIV`'s always-float result).
+Calls to routines are `CALL32 <absolute address>`. Imported code is part of the main program.
+
+## Limits
+
+256 variables, 256 arrays, 256 string literals and 256 numeric constants per program (one-byte operands, not checked by the compiler).

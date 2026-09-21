@@ -1,20 +1,11 @@
 # Capabilities
 
-Some standard-library functionality is gated behind **capabilities** — optional features a given VM build may or may not implement (for example, a minimal embedded build might omit `FS` or `HTTP`).
-
-| Function | Description |
-|---|---|
-| `assertCapability name` | Check whether capability `name` is implemented by this VM build; raises a runtime error if it isn't |
+A **capability** is a named feature the host provides. A script can require one:
 
 ```lumen
-assertCapability 'HTTP'
+assertCapability('HTTP')
 ```
 
-Capability names: 
-- `'FS'` (file I/O)
+If the host does not provide it, the program stops with `Function error` and `assertCapability failed: capability HTTP is not present`. The desktop interpreter provides `FS`, `random` and `HTTP`. Embedded hosts and ports provide their own set, see [Platforms & Ports](../platforms/overview.md).
 
-- `'random'` (random number generation)
-
-- `'HTTP'` (HTTP requests).
-
-Calling `assertCapability` is optional — the gated functions behave the same whether or not you assert first. It's a guard you add when a script depends on optional functionality and you want a clean, early error on VM builds that don't include it, rather than failing deeper in the program.
+Put assertions at the top of a script so it fails fast on a host that cannot run it.

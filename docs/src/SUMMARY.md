@@ -19,7 +19,9 @@
 - [Conditionals](./language-guide/conditionals.md)
 - [Loops](./language-guide/loops.md)
 - [Labels & Jumps](./language-guide/labels-and-jumps.md)
-- [Routines](./language-guide/routines.md)
+- [Arrays](./language-guide/arrays.md)
+- [Routines & Functions](./language-guide/routines.md)
+- [Imports](./language-guide/imports.md)
 - [Capabilities](./language-guide/capabilities.md)
 - [Standard Library](./language-guide/standard-library.md)
 
@@ -50,6 +52,7 @@
 - [Compiler Pipeline](./architecture/overview.md)
 - [Bytecode Format](./architecture/bytecode-format.md)
 - [The Virtual Machine](./architecture/virtual-machine.md)
+- [Memory & Garbage Collection](./architecture/memory.md)
 
 # Debugging & Tooling
 

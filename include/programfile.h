@@ -8,6 +8,7 @@ public:
     std::vector<std::string> stringPool;
     std::vector<double> constPool;
     int variableCount;
+    std::string debugData;
     bool save(const std::string& path);
     bool load(const std::string& path);
 };
