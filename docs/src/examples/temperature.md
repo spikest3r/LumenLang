@@ -1,63 +1,51 @@
 # Temperature Converter
 
-Generate it:
-
 ```bash
 lumen --examples temperature
 ```
 
 ```lumen
-temp = 0
-result = 0
+function c2f(temp)
+return temp * 9 / 5 + 32
+endfunction
 
-routine c2f
-result = temp * 9 / 5 + 32
-endroutine
-
-routine f2c
+function f2c(temp)
 result = temp - 32
-result = result * 5 / 9
+return result * 5 / 9
+endfunction
+
+routine ask()
+print('Temparature: ')
 endroutine
 
-routine ask
-print 'Temparature: '
+routine show(result)
+print('Result: ')
+println(result)
 endroutine
 
-routine show
-print 'Result: '
-println result
-endroutine
-
-println '1. C to F'
-println '2. F to C'
-print 'Select mode '
-mode = 0
-inputInt &mode
+println('1. C to F')
+println('2. F to C')
+print('Select mode ')
+mode = inputInt()
 if mode == 1
-    call ask
-    inputInt &temp
-    call c2f
-    call show
+ask()
+temp = inputInt()
+result = c2f(temp)
+show(result)
 elif mode == 2
-    call ask
-    inputInt &temp
-    call f2c
-    call show
+ask()
+temp = inputInt()
+result = f2c(temp)
+show(result)
 else
-    println 'Incorrect mode'
+println('Incorrect mode')
 endif
 ```
 
-The most feature-complete example in the box. It combines:
+Two **functions** compute a value and `return` it; two **routines** print. Definitions come first, but they could equally follow the main code. Parameters are global variables, so `temp` in the main program and the `temp` parameter are the same variable.
 
-- **Four routines** (`c2f`, `f2c`, `ask`, `show`) that communicate purely through the shared variables `temp` and `result` — see [Routines](../language-guide/routines.md) for why this pattern exists.
-- **`elif` chain** to build a three-way menu (`mode == 1`, `mode == 2`, anything else) — see [Conditionals](../language-guide/conditionals.md).
-- **`inputInt`** used twice: once for the menu selection, once for the temperature value itself.
-
-It's a good template to copy from when you want a small menu-driven Lumen program with reusable logic.
+Touches: [routines & functions](../language-guide/routines.md), [conditionals](../language-guide/conditionals.md).
 
 ## Scan into Android
 
 ![QR for the temperature example](../images/qrcodes/temperature.png)
-
-See [Lumen on Android](../lumen-in-apps/lumen-on-android.md) for how the scan-and-run pipeline works.

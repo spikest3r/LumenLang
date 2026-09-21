@@ -1,27 +1,19 @@
 # Labels & Jumps Demo
 
-Generate it:
-
 ```bash
 lumen --examples infinite-loop
 ```
 
+This writes `infinite.lmn`:
+
 ```lumen
-label repeat
-println 'Hello, world!'
-jump repeat
+label loop
+println('Hello, world!')
+jump loop
 ```
 
-The smallest possible demonstration of Lumen's looping primitive. `label repeat` marks a point in the program; `jump repeat` transfers control back to it — forever, in this case, since there's no condition around the jump. Run it and stop it with `Ctrl+C`.
-
-See [Labels & Jumps](../language-guide/labels-and-jumps.md) for how to turn this into a bounded loop with an exit condition.
+`label loop` marks a position; `jump loop` goes back to it, forever. Stop it with Ctrl+C. See [Labels & Jumps](../language-guide/labels-and-jumps.md) for conditional loops built from the same two statements.
 
 ## Scan into Android
 
 ![QR for the labels-and-jumps example](../images/qrcodes/jump.png)
-
-See [Lumen on Android](../lumen-in-apps/lumen-on-android.md) for how the scan-and-run pipeline works.
-
-### Note
-
-This particular program never halts on its own (`Ctrl+C` on desktop) — on Android, use the runtime's [cooperative cancellation](../lumen-in-apps/lumen-on-android.md#cancellation) to stop it instead.

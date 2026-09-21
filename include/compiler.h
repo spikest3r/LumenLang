@@ -4,6 +4,14 @@
 #include "types.h"
 #include "tokenizer.h"
 
+struct CompileState;
+
+struct Function {
+    uint8_t opcode;
+    uint8_t argCount;
+    bool returnable;
+};
+
 int compile(std::string fileName,
     CompilerData* compilerData,
     bool verbose = false, bool debugInfo = false
@@ -11,7 +19,7 @@ int compile(std::string fileName,
 
 int compileFromFile(std::ifstream& file,
     CompilerData* compilerData,
-    bool verbose = false, bool debugInfo = false, std::string fileName = ""
+    bool verbose = false, bool debugInfo = false, std::string fileName = "", CompileState* prevState = nullptr
 );
 
 int compileFromText(const std::string& text,

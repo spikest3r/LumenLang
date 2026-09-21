@@ -21,7 +21,7 @@ bool BinaryProgram::save(const std::string& path) {
         out.write(reinterpret_cast<char*>(&len), sizeof(int));
         out.write(str.data(), len);
     }
-    
+
     // const pool (double, v3+)
     int cpSize = (int)constPool.size();
     out.write(reinterpret_cast<char*>(&cpSize), sizeof(int));
@@ -29,6 +29,11 @@ bool BinaryProgram::save(const std::string& path) {
 
     // variable index
     out.write(reinterpret_cast<char*>(&variableCount), sizeof(int));
+
+    // debug data
+    int debugDataSize = (int)debugData.size();
+    out.write(reinterpret_cast<char*>(&debugDataSize), sizeof(int));
+    out.write(debugData.data(), debugDataSize);
 
     return true;
 }
@@ -105,6 +110,16 @@ bool BinaryProgram::load(const std::string& path) {
 
     // variable count
     in.read(reinterpret_cast<char*>(&variableCount), sizeof(int));
+
+    // debug data
+    // Optional so binaries produced without debugData remain loadable.
+    debugData.clear();
+
+    int debugDataSize = 0;
+    if (in.read(reinterpret_cast<char*>(&debugDataSize), sizeof(int))) {
+        debugData.resize(debugDataSize);
+        in.read(debugData.data(), debugDataSize);
+    }
 
     return true;
 }

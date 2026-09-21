@@ -2,58 +2,33 @@
 
 ## Arithmetic
 
-| Operator | Meaning |
-|---|---|
-| `+` | Addition |
-| `-` | Subtraction |
-| `*` | Multiplication |
-| `/` | Division — **always produces a float result**, even for two integers |
-| `%` | Modulo |
-| `^` | Exponentiation |
+| Operator | Meaning | Notes |
+|---|---|---|
+| `+` `-` `*` | add, subtract, multiply | Integer result when both operands are integers, float otherwise. |
+| `/` | divide | Always a float division: `7 / 2` is `3.5`. |
+| `%` | remainder | Integer remainder for integers, `fmod` for floats. Integer `% 0` is a runtime error. |
+| `^` | power | `2 ^ 10` is `1024`; `2 ^ 0.5` is a float. Right associative. |
+| `-x` | negation | Binds tighter than `^`: `-2 ^ 2` is `4`. |
+| `( )` | grouping | |
 
-If either operand of `+`, `-`, `*`, `%`, or `^` is a [float](./variables-and-values.md#float-literals), the result is a float; if both operands are integers, the result stays an integer. `/` is the one exception — it always yields a float, so `7 / 2` is `3.5`, not `3`:
-
-```lumen
-a = 7
-b = 2
-c = a / b
-println c   # 3.500000
-```
-
-Parentheses can be used to control evaluation order:
+Precedence, high to low: unary `-`, `^`, `* / %`, `+ -`, `..`.
 
 ```lumen
-z = -20
-a = z
-b = 30
-c = a + b
-d = c * a + b
-e = d / (a + b)
-println e
+println(2 ^ 3 ^ 2)   # 512
+println(10 - 2 - 3)  # 5
+println(7 % 3)       # 1
 ```
+
+Arithmetic on a string literal is rejected at compile time (`type error: arithmetic operator '+' cannot be applied to a string literal`). Arithmetic on a string *variable* is caught at run time: `Runtime error`, then `type error: arithmetic on a string value`, and the program stops.
+
+## String join
+
+`..` joins two values into a string; numbers are converted. It has the lowest precedence, so `'n=' .. 1 + 2` gives `n=3`.
 
 ## Comparison
 
-Used in [conditionals](./conditionals.md) and [conditional jumps](./labels-and-jumps.md). Comparisons read both operands as `double`, so an integer and a float compare correctly against each other (`5 == 5.0` is true):
+`==`, `!=`, `<`, `>`, `<=`, `>=` are used in [`if`, `elif` and `while`](./conditionals.md). Numbers compare numerically (`5 == 5.0` is true) and two strings compare lexicographically. A condition holds exactly one comparison; there is no `and`, `or` or `not`, so nest `if` blocks instead.
 
-| Operator | Meaning |
-|---|---|
-| `==` | Equal |
-| `!=` | Not equal |
-| `>` | Greater than |
-| `<` | Less than |
-| `>=` | Greater than or equal |
-| `<=` | Less than or equal |
+## Reference operators
 
-## String concatenation
-
-`..` concatenates two values into a string:
-
-```lumen
-name = 'Ryan'
-text = 'Hello, ' .. name
-
-println text
-```
-
-See [Strings](./strings.md) for more.
+`&x` and `*r` are covered in [References & Dereferencing](./references.md).

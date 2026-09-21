@@ -2,81 +2,76 @@
 #include "includes.h"
 
 struct Example {
-    std::string* codePtr;
-    std::string fileName;
+std::string* codePtr;
+std::string fileName;
 };
 
-std::string fizzbuzz = R"(print 'N='
-inputInt &x
+std::string fizzbuzz = R"(print('N=')
+x = inputInt()
 repeat x, n
 n = n + 1
 if n % 15 == 0
-println 'FizzBuzz'
+println('FizzBuzz')
 elif n % 5 == 0
-println 'Buzz'
+println('Buzz')
 elif n % 3 == 0
-println 'Fizz'
+println('Fizz')
 else
-println n
+println(n)
 endif
 endrepeat
 )";
 
-std::string temperature = R"(temp = 0
-result = 0
+std::string temperature = R"(function c2f(temp)
+return temp * 9 / 5 + 32
+endfunction
 
-routine c2f
-result = temp * 9 / 5 + 32
-endroutine
-
-routine f2c
+function f2c(temp)
 result = temp - 32
-result = result * 5 / 9
+return result * 5 / 9
+endfunction
+
+routine ask()
+print('Temparature: ')
 endroutine
 
-routine ask
-print 'Temparature: '
+routine show(result)
+print('Result: ')
+println(result)
 endroutine
 
-routine show
-print 'Result: '
-println result
-endroutine
-
-println '1. C to F'
-println '2. F to C'
-print 'Select mode '
-mode = 0
-inputInt &mode
+println('1. C to F')
+println('2. F to C')
+print('Select mode ')
+mode = inputInt()
 if mode == 1
-call ask
-inputInt &temp
-call c2f
-call show
+ask()
+temp = inputInt()
+result = c2f(temp)
+show(result)
 elif mode == 2
-call ask
-inputInt &temp
-call f2c
-call show
+ask()
+temp = inputInt()
+result = f2c(temp)
+show(result)
 else
-println 'Incorrect mode'
-endif
+println('Incorrect mode')
 endif
 )";
 
 std::string age = R"(yearNow = 2026
 userYear = 0
-println 'Hello, world!'
-print 'Enter your birth year: '
-inputInt &userYear
+println('Hello, world!')
+print('Enter your birth year: ')
+userYear = inputInt()
 age = yearNow - userYear
-print 'Your age: '
-println age
+print('Your age: ')
+println(age)
 )";
 
-std::string infinite_loop = R"(label repeat
-println 'Hello, world!'
-jump repeat
+std::string infinite_loop = R"(label loop
+println('Hello, world!')
+jump loop
 )";
 
 std::unordered_map<std::string, Example> exampleMap = {

@@ -1,11 +1,11 @@
 # Comments
 
-Comments start with `#` and run to the end of the line. They can be their own line or trail after code.
+A `#` starts a comment that runs to the end of the line. It can follow code, and a `#` inside a string literal is just text.
 
 ```lumen
-# This is a comment
-
-println 'Hello!' # Inline comments work too
+# a full-line comment
+x = 5 # a trailing comment
+println('a # not a comment')
 ```
 
-There is no block comment syntax — every comment is single-line.
+There are no block comments. Indentation and blank lines are ignored, so indent bodies however you like.

@@ -9,7 +9,7 @@ LumenLang is a solo, exploratory project, but issues, pull requests, and questio
    ```bash
    ./test.sh
    ```
-   This exercises the compiler and VM end-to-end. Any change to `src/compiler.cpp`, `src/vm.cpp`, `src/tokenizer.cpp`, or the bytecode format should leave this passing.
+   This exercises the compiler and VM end-to-end. Any change to `src/compiler/`, `src/vm/`, `src/tokenizer.cpp`, or the bytecode format should leave this passing.
 3. **Keep the disassembler and debug symbols in sync.** If you add or change an opcode, update `disassemblyMap` in `src/disassembler.cpp` and `getOpCodeOffset()` in `src/helpers.cpp` together — a mismatch between the two silently corrupts disassembly output. See [Opcode Reference](./reference/opcodes.md).
 
 ## Where things live
@@ -17,9 +17,9 @@ LumenLang is a solo, exploratory project, but issues, pull requests, and questio
 | Area | Files |
 |---|---|
 | Tokenizer | `src/tokenizer.cpp`, `include/tokenizer.h` |
-| Compiler | `src/compiler.cpp`, `src/compiler_math.cpp`, `include/compiler.h` |
-| Virtual machine | `src/vm.cpp`, `include/vm.h` |
-| Native functions | `src/vmfuncmap.cpp` |
+| Compiler | `src/compiler/*.cpp` (statements, expressions, tables, finalize), `include/compiler.h`, `include/compiler_internal.h` |
+| Virtual machine | `src/vm/vm.cpp`, `src/vm/translator.cpp`, `src/vm/memoryallocator.cpp`, `include/vm.h` |
+| Native functions | `src/vm/vmfuncmap.cpp` (implementation), `src/compiler/compiler_tables.cpp` (`funcList`) |
 | Binary `.bin` format | `src/programfile.cpp`, `include/programfile.h` |
 | Disassembler | `src/disassembler.cpp`, `include/disassembler.h` |
 | Interactive debugger | `src/debugvm.cpp` |

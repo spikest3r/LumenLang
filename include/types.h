@@ -4,7 +4,8 @@
 typedef enum {
     TAG_INT = 2,
     TAG_FLOAT = 3,
-    TAG_STRING = 1
+    TAG_STRING = 1,
+    TAG_ARRAY = 4
 } TypeTag;
 
 typedef struct {
@@ -19,25 +20,11 @@ struct VMProgramData {
     int variableCount = 0;
 };
 
-struct CallFrame {
-    int returnPC;
-    int routineBase;
-};
-
-struct VMExecutionData {
-    std::vector<Variant> variables;
-    std::vector<Variant> stack;
-    std::vector<CallFrame> pcStack;
-
-    int PC = 0;
-    int routineBase = 0;
-    bool halt = false;
-};
-
 typedef enum {
     NONE,
     ASSIGN,
     FUNC_CALL,
+    ROUTINE_CALL,
     PUSH_STACK,
     LABEL,
     JUMP,

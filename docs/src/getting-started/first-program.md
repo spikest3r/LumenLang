@@ -1,81 +1,46 @@
-# Your First Lumen Program
+# Your First Program
 
-The fastest way to get oriented is to let Lumen generate a starter script for you.
-
-## Generate a starter program
+Let the interpreter write a starter script for you:
 
 ```bash
 lumen --introduction
 ```
 
-This writes a file called `helloworld.lmn` in the current directory:
+This creates `helloworld.lmn` in the current directory:
 
 ```lumen
-println 'Hello, world!'
+println('Hello, world!')
 
-name = ''
-print 'What`s your name? '
-inputStr &name
+print('What`s your name? ')
+name = inputStr()
 
 greeting = 'Hello, ' .. name .. '!'
-println greeting
+println(greeting)
 ```
 
-It also prints a short welcome message pointing you at the next steps.
-
-## Run it
+Run it:
 
 ```bash
 lumen helloworld.lmn
 ```
 
-```
+```text
 Hello, world!
 What`s your name? Ryan
 Hello, Ryan!
 ```
 
-When you run a `.lmn` file with no flags, Lumen **compiles and executes it in one step** — you don't need to invoke the compiler and VM separately unless you want to (see [CLI Reference](./cli-reference.md)).
+## What happened
 
-## Explore the built-in examples
+1. `lumen helloworld.lmn` compiled the script to `helloworld.lmn.bin` and immediately ran it. See [CLI Reference](./cli-reference.md) to do the two steps separately.
+2. `println('...')` and `print('...')` are built-in functions. `println` appends a newline, `print` does not.
+3. `inputStr()` reads one whitespace-delimited word from standard input and *returns* it, so it is used on the right-hand side of an assignment.
+4. `..` joins strings. Numbers are converted automatically.
 
-Lumen ships with a handful of example programs baked into the binary. List them:
+The backtick in ``What`s`` is only a habit: `\'` also works inside a single-quoted string. See [Strings](../language-guide/strings.md).
 
-```bash
-lumen --examples
-```
+## Next steps
 
-```
-Available examples:
-  age               Age calculator
-  infinite-loop     Infinite loop demonstrating labels and jumps
-  temperature       Temperature converter
-  fizzbuzz          Classical FizzBuzz algorithm
-
-Generate an example:
-  lumen --examples <name>
-```
-
-Generate one to disk:
-
-```bash
-lumen --examples fizzbuzz
-```
-
-```
-Created 'fizzbuzz.lmn'!
-Run it with: lumen fizzbuzz.lmn
-```
-
-And run it:
-
-```bash
-lumen fizzbuzz.lmn
-```
-
-Each of these is walked through in detail in the [Examples](../examples/index.md) chapter.
-
-## What's next
-
-- Read through the [Language Guide](../language-guide/comments.md) to learn Lumen's syntax feature by feature.
-- Or jump straight to the [CLI Reference](./cli-reference.md) to see every flag `lumen` supports.
+- Generate the bundled programs with `lumen --examples <name>` (see [Examples](../examples/index.md)).
+- Learn the [language](../language-guide/comments.md) topic by topic.
+- Step through the program with `lumen helloworld.lmn --debugger`, see [Interactive Debugger](../debugging/interactive-debugger.md).

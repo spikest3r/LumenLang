@@ -54,7 +54,8 @@ std::string disassembleBin() {
     return disassemble(
         program.bytecode,
         program.stringPool,
-        program.constPool
+        program.constPool,
+        program.debugData
     );
 }
 

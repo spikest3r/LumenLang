@@ -3,9 +3,12 @@ project(lumen)
 
 set(CMAKE_CXX_STANDARD 20)
 
-file(GLOB SOURCES "src/*.cpp")
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp")
 
 add_executable(lumen ${SOURCES})
+
+target_compile_options(lumen PRIVATE -fexceptions)
+target_link_options(lumen PRIVATE -fexceptions)
 
 target_include_directories(lumen PRIVATE include)
 

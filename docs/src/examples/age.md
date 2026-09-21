@@ -1,7 +1,5 @@
 # Age Calculator
 
-Generate it:
-
 ```bash
 lumen --examples age
 ```
@@ -9,15 +7,15 @@ lumen --examples age
 ```lumen
 yearNow = 2026
 userYear = 0
-println 'Hello, world!'
-print 'Enter your birth year: '
-inputInt &userYear
+println('Hello, world!')
+print('Enter your birth year: ')
+userYear = inputInt()
 age = yearNow - userYear
-print 'Your age: '
-println age
+print('Your age: ')
+println(age)
 ```
 
-A minimal but complete program: it declares two variables, reads an integer from the user with `inputInt`, does one subtraction, and prints the result with a mix of `print` and `println`.
+A minimal but complete program: two variables, an integer read with `inputInt()`, one subtraction, and a mix of `print` and `println`.
 
 Touches: [variables](../language-guide/variables-and-values.md), [input/output](../language-guide/input-output.md), [arithmetic operators](../language-guide/operators.md).
 
