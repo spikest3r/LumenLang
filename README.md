@@ -1,5 +1,7 @@
 # LumenLang
 
+## As of now, AVR branch is frozen to Lumen 3.1 (so some bugs are still present) since AVR port is still in progress. It appears that Lumen 4 probably won't run on AVR anytime soon due to some new features of the language that make this really challenging on such hardware.
+
 A lightweight, stack-based scripting language with a custom compiler, bytecode format, and virtual machine written in C++20.
 
 Lumen is designed to be simple to learn while still exposing the concepts behind real programming languages: compilation, bytecode execution, virtual machines, debugging, and optimization.
