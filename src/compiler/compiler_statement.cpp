@@ -206,72 +206,50 @@ int compileLine(const std::string& currentLine, CompileState& state, CompilerDat
             state.blockDepth.push_back(BlockType::IF);
             state.elseDefined.push_back(false);
             state.condJumpStack.push_back(-1);
-            state.elseJumpStack.push_back({-1});
+            state.elseJumpStack.emplace_back();   // list of end-jumps, starts empty
             continue;
         }
         else if (token == "endif") {
-            if (state.blockDepth.size() == 0 || state.blockDepth.back() != BlockType::IF) {
+            if (state.blockDepth.empty() || state.blockDepth.back() != BlockType::IF) {
                 printError("Unexpected 'endif' (no matching 'if')", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
-            bool isElseDefined = state.elseDefined.back();
-            int i;
-            for (i = state.blockDepth.size() - 1; i > 0; i--) {
-                if (state.blockDepth[i] == BlockType::IF) break;
-            }
-            if (isElseDefined) {
-                auto toPatch = state.elseJumpStack.back();
-                for (auto loc : toPatch) {
-                    if (loc == -1) continue;
-                    patchUint32(bytecode, loc, static_cast<uint32_t>(bytecode.size()));
-                }
-            }
-            else {
-                int loc = state.condJumpStack.back();
-                patchUint32(bytecode, loc, static_cast<uint32_t>(bytecode.size()));
-            }
+            uint32_t end = static_cast<uint32_t>(bytecode.size());
+            for (int loc : state.elseJumpStack.back())
+                patchUint32(bytecode, loc, end);
+            if (!state.elseDefined.back())   // last condition's false-jump falls to here
+                patchUint32(bytecode, state.condJumpStack.back(), end);
+
             state.condJumpStack.pop_back();
             state.elseJumpStack.pop_back();
-            state.blockDepth.erase(state.blockDepth.begin() + i);
+            state.blockDepth.pop_back();
             state.elseDefined.pop_back();
             continue;
         }
-        else if (token == "else") {
-            if (state.blockDepth.size() == 0 || state.blockDepth.back() != BlockType::IF) {
-                printError("Unexpected 'else' (no matching 'if')", state.lineIndex, state.ownFilename.back());
+        else if (token == "else" || token == "elif") {
+            if (state.blockDepth.empty() || state.blockDepth.back() != BlockType::IF) {
+                printError("Unexpected '" + token + "' (no matching 'if')", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
-            state.elseDefined.back() = true;
-            int loc = state.condJumpStack.back();
-
-            // Patch false-jump location to skip the upcoming 5-byte 'JUMP32 target' instruction (1 byte opcode + 4 bytes uint32)
-            patchUint32(bytecode, loc, static_cast<uint32_t>(bytecode.size() + 5));
-
-            bytecode.push_back(0x06); // JUMP32
-            emitUint32(bytecode, 0x00000000);
-            state.elseJumpStack.back().back() = static_cast<int>(bytecode.size() - 4); // Track location of jump target
-            continue;
-        } else if(token == "elif") {
-            // else
-            if (state.blockDepth.size() == 0 || state.blockDepth.back() != BlockType::IF) {
-                printError("Unexpected 'elif' (no matching 'if')", state.lineIndex, state.ownFilename.back());
+            if (state.elseDefined.back()) {
+                printError("'" + token + "' after 'else'", state.lineIndex, state.ownFilename.back());
                 return -1;
             }
-            state.elseDefined.back() = true;
-            int loc = state.condJumpStack.back();
 
-            // Patch false-jump location to skip the upcoming 5-byte 'JUMP32 target' instruction (1 byte opcode + 4 bytes uint32)
-            patchUint32(bytecode, loc, static_cast<uint32_t>(bytecode.size() + 5));
+            // previous condition's false-jump lands right after the JUMP32 emitted below
+            patchUint32(bytecode, state.condJumpStack.back(), static_cast<uint32_t>(bytecode.size() + 5));
 
-            bytecode.push_back(0x06); // JUMP32
+            bytecode.push_back(0x06); // JUMP32 to end of if-chain
+            state.elseJumpStack.back().push_back(static_cast<int>(bytecode.size()));
             emitUint32(bytecode, 0x00000000);
-            state.elseJumpStack.back().back() = static_cast<int>(bytecode.size() - 4); // Track location of jump target
 
-            // if
-            state.condJumpStack.push_back(-1);
-            state.elseJumpStack.back().push_back(-1);
-            op = IF;
-
+            if (token == "elif") {
+                state.condJumpStack.back() = -1;  // reuse slot, don't push a new one
+                op = IF;                          // rest of the line is the condition
+            }
+            else {
+                state.elseDefined.back() = true;
+            }
             continue;
         }
         else if (token == "while") {
